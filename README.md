@@ -1,26 +1,61 @@
-2000 - 2021 Stock Dataset Analysis
+# Stock Market Data Analysis (1999-2021)
 
-DATASET SOURCE: https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset
+## Project Overview
 
-## Project Review:
+This project focused on the statistical and econometric analysis of stock market data.
+The goal is to examine return behavior, volatility patters, and relationships between trading activity and price dynamics.
+
+---
+
+## Dataset
+
+SOURCE: https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset
+
+- Historical stock data (OHLCV)
+- All NASDAQ tickers
+- Time period: 1999-2021
+
+---
+
+## Data Cleaning
+
+The dataset wa preprocessed to ensure data quality
 
 ### Date
 - Standardized date column
 
 ### Missing Values
-- Deleted 649 rows with missing values
+- Removed 649 rows with missing values
 
 ### Duplicates
-- Deleted all duplicates
+- All duplicate rows were removed
 
-### Logic test
-- Got 1264 invalid rows
-- Deleted it
-- A significant number of records had invalid Open prices equal to zero
-it has been treated as missing values and removed to ensure data integrity.
+### Logical Consistency Check
+- Removed 1264 invalid rows where:
+  - High < Low
+  - High < Close
+  - Low > Close
+  - Volume < 0
 
+### Invalid Prices
+- A significant number of records (~1 mln) had invalid Open prices equal to zero.
+- It has been treated as missing values and removed to ensure data integrity.
 
-1. Как ведут себя цены?
-2. Как распределены доходности?
-3. Есть ли волатильность кластерами?
-4. Есть ли зависимости (autocorrelation)?
+---
+
+## Feature Engineering
+
+The following variables were calculated:
+
+- Returns 
+- Log Returns
+- Volatility in 10 days periods
+- Moving Averages (SMA 10, SMA 50)
+- Momentum (10-day return)
+- Volume change
+- Target (variable was defined as the next-day return to support predictive modeling) 
+
+---
+
+## Exploratory Data Analysis (EDA)
+
