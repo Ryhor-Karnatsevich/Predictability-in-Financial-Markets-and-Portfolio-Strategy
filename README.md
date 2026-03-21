@@ -59,3 +59,9 @@ The following variables were calculated:
 
 ## Exploratory Data Analysis (EDA)
 
+### Stock Graphics
+- Defined 'graphics' function to make initial analysis of stocks behavior.
+- Created 50 graphics and only one was corrupted. Trend was flat and abrupt. 
+From that I can conclude that in common data was usable for next analysis. 
+
+### Stock 

@@ -11,11 +11,11 @@ else:
 df = pd.read_csv(path)
 
 ### Basic check
-# print(df.head())
-# print(df.shape)
-# print(df.describe())
-# print(df.info())
-# print(df.columns)
+print(df.head())
+print(df.shape)
+print(df.describe())
+print(df.info())
+print(df.columns)
 
 ### Data Cleaning
 
