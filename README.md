@@ -13,7 +13,7 @@ SOURCE: https://www.kaggle.com/datasets/jacksoncrow/stock-market-dataset
 
 - Historical stock data (OHLCV)
 - All NASDAQ tickers
-- Time period: 1999-2021
+- Time period: 1962-2021
 
 ---
 
@@ -65,7 +65,7 @@ Two levels of analysis were defined: market level and stock level.
 
 ### Records Distribution
 - Distribution is strongly left-skewed.
-- About half of ticker had a data records during all observed period. 
+- A large proportion of stocks have observations covering nearly the entire time period.
 - However, some stocks have significantly fewer data points due to later listing dates.
 
 ### Returns Distribution
@@ -84,10 +84,11 @@ Two levels of analysis were defined: market level and stock level.
 ## Stock Level
 
 ### Price Behavior
-- Stock prices exhibit long-term trends with short-term fluctuations.
+- Most stocks exhibit long-term trends combined with short-term fluctuations.
+- While many stocks show upward trends, some display significant declines or unstable behavior.
 
 ### Returns Behavior
-- Returns fluctuate around zero and appear largely random.
+- Returns fluctuate around zero and appear largely random across different stocks.
 
 ### Volatility Behavior
 - Some evidence of volatility clustering is observed, where periods of higher volatility tend to persist.
