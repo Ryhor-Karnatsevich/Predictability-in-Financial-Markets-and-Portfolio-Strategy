@@ -20,6 +20,7 @@ print(df.columns)
 ### Data Cleaning
 
 df["Date"] = pd.to_datetime(df["Date"])
+df = df[df['Date'].dt.year >= 2000]
 
 print(df[df.isnull().any(axis=1)])
 df = df.dropna()
@@ -56,9 +57,6 @@ df = df.sort_values(["Ticker","Date"])
 df = df.reset_index(drop=True)
 
 df.to_csv(output_path, index=False)
-
-
-
 
 
 
