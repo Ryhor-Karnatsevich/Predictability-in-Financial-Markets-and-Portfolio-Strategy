@@ -15,13 +15,13 @@ df = pd.read_csv(path)
 df['Date'] = pd.to_datetime(df['Date'])
 all_tickers = df['Ticker'].unique()
 
+### EDA Setup
+run_market_eda = True
+corr_sample = 20
 # 1 Market Level
 ###------------------------------------------------------------------------------
 ### GET TICKERS
 ###------------------------------------------------------------------------------
-run_market_eda = False
-corr_sample = 20
-
 if run_market_eda:
     # Returns Distribution
     plt.figure(figsize=(10, 5))
@@ -73,10 +73,7 @@ def get_tickers(all_tickers):
         else:
             return []
 
-
 selected = get_tickers(all_tickers)
-
-
 # --------------------------------------------------------------------------------
 
 #### Graphics
@@ -84,7 +81,6 @@ def graphics(selected):
     for ticker in selected:
         df[df['Ticker'] == ticker].plot(x='Date', y="Close", title=ticker)
         plt.show()
-
 
 ### Histograms
 def histogram(selected):
@@ -94,14 +90,12 @@ def histogram(selected):
         plt.title(f"Returns Distribution: {ticker}")
         plt.show()
 
-
 ### Volatility Clustering
 def clustering(selected):
     for ticker in selected:
         data = df[df['Ticker'] == ticker]
         data.plot(x='Date', y='Volatility', figsize=(10, 5), title=f"Volatility over time: {ticker}")
         plt.show()
-
 
 ### Rolling Mean vs Price
 def SMA(selected):
@@ -114,7 +108,6 @@ def SMA(selected):
         plt.legend()
         plt.show()
 
-
 ### ACF
 def ACF(selected, lags=30):
     for ticker in selected:
@@ -122,12 +115,9 @@ def ACF(selected, lags=30):
 
         fig, ax = plt.subplots(figsize=(10, 5))
         plot_acf(ticker_data, lags=lags, ax=ax)
-
-        ax.set_ylim(-0.15, 0.15)
-
-        plt.title(f"ACF Zoomed: {ticker}")
+        ax.set_ylim(-0.25, 0.25)
+        plt.title(f"ACF: {ticker} (Range from -0.25 to 0.25)")
         plt.show()
-
 
 ###---------------------------------------------------------------------------
 ### Running all functions
@@ -140,7 +130,3 @@ if selected:
     ACF(selected)
 else:
     print("ERROR OR WRONG INPUT")
-
-
-
-
