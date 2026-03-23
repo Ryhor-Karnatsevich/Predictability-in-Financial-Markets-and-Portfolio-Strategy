@@ -132,3 +132,5 @@ Two levels of analysis were defined: market level and stock level.
 - The results show that lagged returns are statistically significant but economically weak, suggesting only minor short-term momentum effects.
 - Trading volume does not appear to have a statistically significant impact on future returns.
 - The overall explanatory power of the model is very low (R² ≈ 0.001), indicating that stock returns are largely unpredictable.
+
+- Model had an error with heteroscedasticity data, so I used HC3 type to fix it.
