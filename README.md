@@ -120,3 +120,15 @@ Two levels of analysis were defined: market level and stock level.
 - Most stocks have a large number of observations close to the maximum available.
 - However, some stocks have significantly fewer data points due to later listing dates.
 - To ensure data reliability, stocks with fewer than 500 observations were removed.
+
+
+# Model Creating
+
+- In that part I wanted to confirm or refute hypotheses of efficient market and examine valuable information I can use for building investment strategy.
+
+### Ordinary Least Squares (OLS Model)
+- An OLS regression model was used to examine whether past returns and trading volume can predict future returns.
+---
+- The results show that lagged returns are statistically significant but economically weak, suggesting only minor short-term momentum effects.
+- Trading volume does not appear to have a statistically significant impact on future returns.
+- The overall explanatory power of the model is very low (R² ≈ 0.001), indicating that stock returns are largely unpredictable.
