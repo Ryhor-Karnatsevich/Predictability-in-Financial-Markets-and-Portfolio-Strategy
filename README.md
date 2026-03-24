@@ -125,28 +125,51 @@ Two levels of analysis were defined: market level and stock level.
 
 # Model Creating
 
-- In that part I wanted to confirm or refute hypotheses of efficient market and examine valuable information I can use for building investment strategy.
-
+- The goal of this section is to test the Efficient Market Hypothesis and examine whether stock behavior is predictable.
 
 ## Ordinary Least Squares (OLS Model)
-
 
 ### Model 1 - Lagged Returns
 Return(t) = β0 + β1 * Return(t-1) + ε
 (This model test  whether past returns can predict future returns.)
 
 ---
+
+**Method**
 - Data was sorted by ticker and date.
 - Created new columns with previous returns ('Return_lag1') 
 - Removed stocks with less than 500 records to avoid data distortion and errors.
 - Train/Test split:
    - Train: before 2019
    - Test: starting with 2019
-- Used *"HC3"* to avoid errors.
+- Used robust standard errors (HC3)
 
-Results:
-![ols1](Pictures/OLS%20Model%201.png)
+---
 
+![ols1](Pictures/ols_1.png)
+
+---
+
+**Interpretation**:
+- The coefficient is not statistically significant and very close to zero. 
+- This indicates that past returns do not predict future returns.
+- No evidence of momentum
+- No evidence of mean reversion
+
+**Financial Insight**:
+- The result support the Efficient Market Hypothesis.
+- It is unlikely to create profitable strategy based on that model.
+
+### Model 2 - 
+Return(t) = β0 + β1 * Volume + ε
+(This model test whether volume can predict future return)
+
+---
+
+**Method**
+- Same
+
+---
 
 
 
