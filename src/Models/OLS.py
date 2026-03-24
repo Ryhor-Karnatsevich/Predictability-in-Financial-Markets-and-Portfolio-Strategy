@@ -29,13 +29,6 @@ df = df.dropna(subset=["Return_lag1", "Volume_lag1", "Returns"])
 train = df[df["Date"] < "2019-01-01"]
 test  = df[df["Date"] >= "2019-01-01"]
 
-train_tickers = set(train["Ticker"].unique())
-test_tickers = set(test["Ticker"].unique())
-
-new_tickers = test_tickers - train_tickers
-print(f"Tickers that appear only in test: {len(new_tickers)}")
-print(new_tickers)
-
 
 print("Train size:", len(train))
 print("Test size:", len(test))

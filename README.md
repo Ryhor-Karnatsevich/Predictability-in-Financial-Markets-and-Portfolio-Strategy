@@ -129,24 +129,28 @@ Two levels of analysis were defined: market level and stock level.
 
 ## Ordinary Least Squares (OLS Model)
 
-### Model 1 - Lagged Returns
-Return(t) = β0 + β1 * Return(t-1) + ε
-(This model test  whether past returns can predict future returns.)
+The purpose of this section is to test whether simple linear relationships can predict future stock returns.
 
----
+Three models were estimated using OLS with robust standard errors '**HC3**'.
 
 **Method**
 - Data was sorted by ticker and date.
-- Created new columns with previous returns ('Return_lag1') 
 - Removed stocks with less than 500 records to avoid data distortion and errors.
+- Created lagged variables: Return_lag1 and Volume_lag1
+- Removed missing values generated after creating lagged variables
 - Train/Test split:
    - Train: before 2019
    - Test: starting with 2019
 - Used robust standard errors (HC3)
 
+### Model 1 - Lagged Returns
+Return(t) = β0 + β1 * Return(t-1) + ε
+
+(This model tests whether past returns can predict future returns)
+
 ---
 
-![ols1](Pictures/ols_1.png)
+![ols1](Pictures/model_1.png)
 
 ---
 
@@ -156,21 +160,45 @@ Return(t) = β0 + β1 * Return(t-1) + ε
 - No evidence of momentum
 - No evidence of mean reversion
 
+### Model 2 - Lagged Volume
+Return(t) = β0 + β1 * Volume(t-1) + ε
+
+(This model tests whether volume change can predict future returns)
+
+---
+
+![ols1](Pictures/model_2.png)
+
+---
+
+**Interpretation**:
+- Volume change does not provide predictive power for returns.
+
+### Model 3 – Combined Model
+Return(t) = β0 + β1 * Return(t-1) + β2 * Volume(t-1) + ε
+
+(This model tests whether both return and volume change can predict future returns)
+
+---
+
+![ols1](Pictures/model_3.png)
+
+---
+
+**Interpretation**:
+- Combining two variables didn't improve the model.
+- Model can't predict future returns.
+
+## Conclusion:
+All three models provide consistent results:
+
+ - Near-zero explanatory power.
+ - No statistically significant predictors.
+ - No improvement across different model specifications.
+
 **Financial Insight**:
-- The result support the Efficient Market Hypothesis.
-- It is unlikely to create profitable strategy based on that model.
-
-### Model 2 - 
-Return(t) = β0 + β1 * Volume + ε
-(This model test whether volume can predict future return)
-
----
-
-**Method**
-- Same
-
----
-
+- The results support the weak form of the Efficient Market Hypothesis (historical price and volume information cannot be used to predict future returns).
+- It is unlikely to build a profitable strategy based on this model.
 
 
 
