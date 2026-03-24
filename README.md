@@ -128,18 +128,26 @@ Two levels of analysis were defined: market level and stock level.
 - In that part I wanted to confirm or refute hypotheses of efficient market and examine valuable information I can use for building investment strategy.
 
 
-### Ordinary Least Squares (OLS Model)
-========================================================
-- An OLS regression model was used to examine whether past returns and trading volume can predict future returns.
----
-- The results show that lagged returns are statistically significant but economically weak, suggesting only minor short-term momentum effects.
-- Trading volume does not appear to have a statistically significant impact on future returns.
-- The overall explanatory power of the model is very low (R² ≈ 0.001), indicating that stock returns are largely unpredictable.
-- Model had an error with heteroscedasticity data, so I used HC3 type to fix it.
-===========================================================
+## Ordinary Least Squares (OLS Model)
 
-#OLS model
-#return
+
+### Model 1 - Lagged Returns
+Return(t) = β0 + β1 * Return(t-1) + ε
+(This model test  whether past returns can predict future returns.)
+
+---
+- Data was sorted by ticker and date.
+- Created new columns with previous returns ('Return_lag1') 
+- Removed stocks with less than 500 records to avoid data distortion and errors.
+- Train/Test split:
+   - Train: before 2019
+   - Test: starting with 2019
+- Used *"HC3"* to avoid errors.
+
+Results:
+![ols1](Pictures/OLS%20Model%201.png)
+
+
 
 
 
