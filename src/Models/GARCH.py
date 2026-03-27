@@ -28,8 +28,8 @@ np.random.seed(52)
 
 ### SETUP
 split_date = "2019-01-01"
-use_random = False
-n = 2
+use_random = True
+n = 1
 
 if use_random:
     tickers = np.random.choice(df["Ticker"].unique(), size=n, replace=False)
@@ -53,15 +53,19 @@ def garch_run(df,ticker,split_date,verbose=True):
         return None
 #-----------------------------------------------------------
 # Model creating
-    model = arch_model(train, vol='GARCH', p=1, q=1, dist='t')
+    model = arch_model(train, vol='APARCH', p=1, q=1, dist='t')
     result = model.fit(disp=0)
 
-    model_full = arch_model(returns, vol='GARCH', p=1, q=1, dist='t')
+    model_full = arch_model(returns, vol='APARCH', p=1, q=1, dist='t')
     test_res = model_full.fix(result.params)
 
 # Metrics
     test_sigma = test_res.conditional_volatility[test.index] # prediction line
+    #mae
     mae = mean_absolute_error(np.abs(test), test_sigma)
+    # relative mae for comparison
+    mean_abs_return = np.mean(np.abs(test))
+    relative_mae = mae / mean_abs_return
 
     alpha = result.params.get("alpha[1]", np.nan)
     beta = result.params.get("beta[1]", np.nan)
@@ -86,6 +90,7 @@ def garch_run(df,ticker,split_date,verbose=True):
         "persistence": persistence,
         "tomorrow_variance": future_variance,
         "MAE": mae,
+        "Relative MAE": relative_mae,
         "train size": len(train),
         "test size": len(test)
     }
