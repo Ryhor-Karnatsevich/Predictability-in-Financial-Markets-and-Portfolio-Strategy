@@ -26,10 +26,10 @@ CONFIGS = {
 }
 
 # Want to save results into csv file?
-save = True
+save = False
 ### SETUP
 
-MODE = "GRID"
+MODE = "FINAL"
 split_date = "2019-01-01"
 use_random = True
 n = 20
@@ -42,7 +42,7 @@ else:
 
 
 ### GARCH Model
-def garch_run(df,ticker,split_date,type,p,q,verbose=False):
+def garch_run(df,ticker,split_date,type,p,q,verbose=True):
 #-----------------------------------------------------------
     data = df[df['Ticker'] == ticker].copy()
     data.set_index("Date", inplace=True)
@@ -169,7 +169,7 @@ elif MODE == "FINAL":
              for ticker in tickers]
 
     results = Parallel(n_jobs=-1)(
-        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
+        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=True)
         for ticker, v, p, q in tasks
     )
 
