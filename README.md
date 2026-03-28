@@ -245,7 +245,7 @@ The purpose of this section is to model and predict volatility os stock returns.
 Unlike previous models, this approach focuses on volatility instead of returns.
 
 ### GRID COMPARISON
-GRID MODE was created to compare multiple specifications and to find the best solution.
+GRID mode was used to compare different volatility models and select the most suitable specification.
 
 **Models tested:**
  - GARCH
@@ -260,21 +260,68 @@ GRID MODE was created to compare multiple specifications and to find the best so
 In total, 9 model configurations were evaluated for each stock.
 
 **Results:**
-- EGARCH(2,1) was the most frequently selected model (13 out of 20).
-- Comparison was based on AIC metric.
-- Other models (APARCH or GARCH) occasionally performed better. 
+- EGARCH(2,1) was most frequently selected (13 out of 20).
+- Selecting was based on AIC metric.
+- Other models occasionally performed better, but differences were small
 - GRID results been saved as GRID.csv
 
 **Conclusion from GRID Research:**
+- EGARCH models are better for asymmetric volatility. 
+- EGARCH(2,1) was chosen as the default model for **"FINAL"** analysis
 
+### FINAL Analysis: EGARCH(2,1)
+**Method:**
+- Data was sorted by ticker and date.
+- Stock with less than 500 observations were removed.
+- Returns were scaled and clipped to ensure stability.
+- Train/Test split:
+   - Train: before 2019
+   - Test: starting with 2019
+- Model was estimated separately for each stock.
+- Random sample of 100 tickers was used.
+- Model with convergence issues were excluded.
+- Parallel computation was used to reduce execution time and improve efficiency.
 
-### EGARCH Analysis 
+### Evaluation Metrics:
+- MAE - Mean absolute error, the lower - the better.
+- Relative MAE - normalized MAE for comparison across stock.
 
+### Model Characteristics:
+- Alpha is a sensitivity to new shock
+- Beta is a persistence of volatility
+- Persistence show how long effects last
+**Results**
+- Persistence is very high ~ 0.98.
+- This indicates that market has a long memory on volatility shocks.
+
+### Interpretation:
+- Persistence is high (close to 1), indicating that volatility shocks persist over time.
+- The model tends to overestimate volatility.
+- Prediction accuracy varies across stocks:
+    - Some stocks model predict accurately
+    - Some show error
+
+### Visual Analysis
+- Predicted volatility is smoother than realized volatility
+- Model reacts to spikes with delay
+- Predictions often stay elevated after volatility decreases
+
+**This results in:**
+- Lagging response to market shocks
+- Systematic overestimation in low-volatility periods
 
 ### Optimization
 - During the programming I explored the way to reduce run time and included paralleled calculating.
-- I reduced time on about 5%. From 139.22 to 132.61 seconds. ( Used 9 models on 10 tickers)[90 rows x 15 columns]
+- I reduced time on about 5%. From 139.22 to 132.61 seconds on a test setup.
 
---
-wrote comments, remember
---
+### Conclusion
+- 
+- EGARCH(2,1) provides stable and consistent results across different stocks
+
+### Financial Insight
+-
+
+### Limitations
+- Model tends to overestimate volatility
+- Performance varies significantly across different stocks
+- Only a subset of stocks was used due to computational constraints
