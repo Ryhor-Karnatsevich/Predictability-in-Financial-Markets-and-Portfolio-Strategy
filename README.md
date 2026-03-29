@@ -287,19 +287,21 @@ In total, 9 model configurations were evaluated for each stock.
 - Relative MAE - normalized MAE for comparison across stock.
 
 ### Model Characteristics:
-- Alpha is a sensitivity to new shock
-- Beta is a persistence of volatility
-- Persistence show how long effects last
-**Results**
-- Persistence is very high ~ 0.98.
-- This indicates that market has a long memory on volatility shocks.
+- **Alpha** measures how strongly predicted volatility reacts to past shocks.
+- **Beta** shows how much yesterday's volatility influences on today's prediction.
+- **Persistence** shows for how long volatility past has an impact on prediction. 
+  **Results**
+- Beta values are very high (~0.97–0.99), indicating strong dependence on past volatility.
+- Persistence is very high ~ 0.98, indicates that market has a long memory in general.
 
 ### Interpretation:
-- Persistence is high (close to 1), indicating that volatility shocks persist over time.
+- Persistence is high (close to 1), indicating that volatility has a long term memory.
 - The model tends to overestimate volatility.
-- Prediction accuracy varies across stocks:
-    - Some stocks model predict accurately
-    - Some show error
+- **Mean Relative MAE** ~ 0.97, suggests that the model captures general volatility dynamics
+- But its predictive performance remains moderate and may not provide a strong advantage:
+    - Some stock have R_MAE ~ 0.65, and it is a good level of prediction and can be used.
+    - Others have it ~ 4.6, indicating that model is completely useless for that stock.
+- **MAE** provides an interpretable measure of prediction error in absolute terms for individual stocks.
 
 ### Visual Analysis
 - Predicted volatility is smoother than realized volatility
@@ -315,13 +317,17 @@ In total, 9 model configurations were evaluated for each stock.
 - I reduced time on about 5%. From 139.22 to 132.61 seconds on a test setup.
 
 ### Conclusion
-- 
-- EGARCH(2,1) provides stable and consistent results across different stocks
+- EGARCH(2,1) provides stable and consistent results across different stocks.
+- Volatility clustering is clearly present in the data.
+- The model successfully captures persistence in volatility.
+- However, prediction accuracy remains not precise enough for exact forecasting in most cases.
 
 ### Financial Insight
--
+- Volatility is predictable due to clustering effects.
+- This means that while direction cannot be reliably forecasted, risk can be managed.
+- GARCH-type models can be useful for risk management, portfolio allocation, and volatility-based strategies.
 
 ### Limitations
 - Model tends to overestimate volatility
-- Performance varies significantly across different stocks
+- Performance slightly varies across different stocks
 - Only a subset of stocks was used due to computational constraints

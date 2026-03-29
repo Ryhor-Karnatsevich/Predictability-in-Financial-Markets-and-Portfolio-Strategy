@@ -29,8 +29,8 @@ save = False
 ### SETUP
 MODE = "FINAL"
 split_date = "2019-01-01"
-use_random = True
-n = 20
+use_random = False
+n = 100
 # configurations for FINAL MODE
 CONFIGS = {
     "DEFAULT": {"type": "EGARCH", "p": 2, "q": 1}
@@ -40,7 +40,7 @@ CONFIGS = {
 if use_random:
     tickers = np.random.choice(df["Ticker"].unique(), size=n, replace=False)
 else:
-    tickers = ["AAPL", "NVDA"]
+    tickers = ["AAPL", "NVDA","GOOGL","MSFT","META","AMZN"]
 
 
 ### GARCH Model
