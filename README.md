@@ -244,6 +244,10 @@ The purpose of this section is to model and predict volatility of stock returns.
 
 Unlike previous models, this approach focuses on volatility instead of returns.
 
+**Hypothesis:**
+
+Stock return volatility exhibits clustering and can be modeled using GARCH-type models.
+
 ### GRID COMPARISON
 GRID mode was used to compare different volatility models and select the most suitable specification.
 
@@ -272,7 +276,7 @@ In total, 9 model configurations were evaluated for each stock.
 ### FINAL Analysis: EGARCH(2,1)
 **Method:**
 - Data was sorted by ticker and date.
-- Stock with fewer than 500 observations were removed.
+- Stocks with fewer than 500 observations were removed.
 - Returns were scaled and clipped to ensure stability.
 - Train/Test split:
    - Train: before 2019
@@ -284,7 +288,7 @@ In total, 9 model configurations were evaluated for each stock.
 
 ### Evaluation Metrics:
 - MAE - Mean absolute error, the lower - the better.
-- Relative MAE - normalized MAE for comparison across stock.
+- Relative MAE - normalized MAE for comparison across stocks.
 
 ---
 
@@ -297,17 +301,17 @@ In total, 9 model configurations were evaluated for each stock.
 - **Beta**: Persistence of past volatility.
 - **Persistence**: The sum of these effects. If it's close to 1, the "memory" of a crisis stays for a long time.
   **Results**
-- Beta values are very high (~0.97–0.99), indicating strong dependence on past volatility.
-- Persistence is very high ~ 0.98, indicates that market has a long memory in general.
+- High **Beta** (~0.97–0.99) indicates that volatility is driven more by past volatility than by new shocks.
+- Persistence is very high ~ 0.98, indicating that volatility has a long term memory.
 
 ### Interpretation:
-- Persistence is high (close to 1), indicating that volatility has a long term memory.
-- The model tends to overestimate volatility.
-- **Mean Relative MAE** ~ 0.97, the model performs close to a naive baseline.
+- The model tends to overestimate volatility, which is consistent with high persistence.
+- **Mean Relative MAE** ~ 0.97, meaning that the prediction error is close to the average magnitude of volatility itself.
+- This is comparable to a naive baseline where volatility is assumed to remain constant.
 - Its predictive performance remains moderate and may not provide a strong advantage:
     - Some stocks have R_MAE ~ 0.65, and it is a good level of prediction and can be used.
-    - Others have it ~ 4.6, indicating that model is completely useless for that stock.
-    - About 80% stocks have R_MAE < 1
+    - Others have it ~ 4.6, indicating that model is completely useless for those stocks.
+    - About 80% of stocks have R_MAE < 1, indicating that for most stocks the model performs better than a naive prediction.
 - **MAE** provides an interpretable measure of prediction error in absolute terms for individual stocks.
 
 ---
@@ -332,14 +336,19 @@ In total, 9 model configurations were evaluated for each stock.
 ### Conclusion
 - FINAL results have been saved as FINAL.csv
 - EGARCH(2,1) provides stable and consistent results across different stocks.
-- Volatility clustering is clearly present in the data.
+- Volatility clustering observed during EDA is confirmed by the model results.
+- The model reacts to volatility shocks rather than predicting them in advance.
 - The model successfully captures persistence in volatility.
-- However, prediction accuracy remains not precise enough for exact forecasting in most cases.
+- However, predictive performance is not consistent across all stocks:
+    - For many stocks, the model performs at a baseline level.
+    - For some stocks, it provides significantly better predictions (low R_MAE).
+    - For others, it fails to capture volatility dynamics.
+
+- This suggests that the model can be useful, but only for specific assets.
 
 ### Financial Insight
-- Volatility is predictable due to clustering effects.
-- This means that while direction cannot be reliably forecasted, risk can be managed.
 - GARCH-type models can be useful for risk management, portfolio allocation, and volatility-based strategies.
+- The model is not suitable for predicting sudden volatility spikes, but rather for estimating the general level of risk.
 
 ### Limitations
 - Model tends to overestimate volatility
