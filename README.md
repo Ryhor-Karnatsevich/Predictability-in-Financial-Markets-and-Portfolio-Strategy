@@ -240,7 +240,7 @@ The purpose of this section is to test whether time series structure in returns 
 
 ## GARCH Model
 
-The purpose of this section is to model and predict volatility os stock returns.
+The purpose of this section is to model and predict volatility of stock returns.
 
 Unlike previous models, this approach focuses on volatility instead of returns.
 
@@ -261,9 +261,9 @@ In total, 9 model configurations were evaluated for each stock.
 
 **Results:**
 - EGARCH(2,1) was most frequently selected (13 out of 20).
-- Selecting was based on AIC metric.
+- Selection was based on AIC metric.
 - Other models occasionally performed better, but differences were small
-- GRID results been saved as GRID.csv
+- GRID results have been saved as GRID.csv
 
 **Conclusion from GRID Research:**
 - EGARCH models are better for asymmetric volatility. 
@@ -272,24 +272,30 @@ In total, 9 model configurations were evaluated for each stock.
 ### FINAL Analysis: EGARCH(2,1)
 **Method:**
 - Data was sorted by ticker and date.
-- Stock with less than 500 observations were removed.
+- Stock with fewer than 500 observations were removed.
 - Returns were scaled and clipped to ensure stability.
 - Train/Test split:
    - Train: before 2019
    - Test: starting with 2019
 - Model was estimated separately for each stock.
 - Random sample of 100 tickers was used.
-- Model with convergence issues were excluded.
+- Models with convergence issues were excluded.
 - Parallel computation was used to reduce execution time and improve efficiency.
 
 ### Evaluation Metrics:
 - MAE - Mean absolute error, the lower - the better.
 - Relative MAE - normalized MAE for comparison across stock.
 
+---
+
+![average](Pictures/average.png)
+
+---
+
 ### Model Characteristics:
-- **Alpha** measures how strongly predicted volatility reacts to past shocks.
-- **Beta** shows how much yesterday's volatility influences on today's prediction.
-- **Persistence** shows for how long volatility past has an impact on prediction. 
+- **Alpha**: Reaction to recent shocks.
+- **Beta**: Persistence of past volatility.
+- **Persistence**: The sum of these effects. If it's close to 1, the "memory" of a crisis stays for a long time.
   **Results**
 - Beta values are very high (~0.97–0.99), indicating strong dependence on past volatility.
 - Persistence is very high ~ 0.98, indicates that market has a long memory in general.
@@ -297,11 +303,18 @@ In total, 9 model configurations were evaluated for each stock.
 ### Interpretation:
 - Persistence is high (close to 1), indicating that volatility has a long term memory.
 - The model tends to overestimate volatility.
-- **Mean Relative MAE** ~ 0.97, suggests that the model captures general volatility dynamics
-- But its predictive performance remains moderate and may not provide a strong advantage:
-    - Some stock have R_MAE ~ 0.65, and it is a good level of prediction and can be used.
+- **Mean Relative MAE** ~ 0.97, the model performs close to a naive baseline.
+- Its predictive performance remains moderate and may not provide a strong advantage:
+    - Some stocks have R_MAE ~ 0.65, and it is a good level of prediction and can be used.
     - Others have it ~ 4.6, indicating that model is completely useless for that stock.
+    - About 80% stocks have R_MAE < 1
 - **MAE** provides an interpretable measure of prediction error in absolute terms for individual stocks.
+
+---
+
+![MLPI](Pictures/MLPI.png)
+
+---
 
 ### Visual Analysis
 - Predicted volatility is smoother than realized volatility
@@ -317,6 +330,7 @@ In total, 9 model configurations were evaluated for each stock.
 - I reduced time on about 5%. From 139.22 to 132.61 seconds on a test setup.
 
 ### Conclusion
+- FINAL results have been saved as FINAL.csv
 - EGARCH(2,1) provides stable and consistent results across different stocks.
 - Volatility clustering is clearly present in the data.
 - The model successfully captures persistence in volatility.
