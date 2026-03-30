@@ -40,7 +40,7 @@ CONFIGS = {
 if use_random:
     tickers = np.random.choice(df["Ticker"].unique(), size=n, replace=False)
 else:
-    tickers = ["AAPL", "NVDA","GOOGL","MSFT","META","AMZN","MLPI"]
+    tickers = ["AAPL", "GILD","GOOGL","MSFT","AMZN","MLPI","PEP","COST","CSCO","AMGN"]
 #["AAPL", "NVDA","GOOGL","MSFT","META","AMZN","MLPI"]
 
 ### GARCH Model
@@ -180,7 +180,7 @@ elif MODE == "FINAL":
              for ticker in tickers]
 
     results = Parallel(n_jobs=-1)(
-        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=True)
+        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
         for ticker, v, p, q in tasks
     )
     results = [r for r in results if r is not None]

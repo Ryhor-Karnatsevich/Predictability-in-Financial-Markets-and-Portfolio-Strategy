@@ -354,3 +354,11 @@ In total, 9 model configurations were evaluated for each stock.
 - Model tends to overestimate volatility
 - Performance slightly varies across different stocks
 - Only a subset of stocks was used due to computational constraints
+
+
+### Backtest
+1. Create 3 strategies and compare them. (sharpe, max drawdown, volatility and return)
+2. Choose best one and Run it, try different variations and choose best parameters.
+3. Robustness: different periods, stocks. and sensivity. 
+4. portfolio maybe.
+0. already have chosen 10 popular stocks.

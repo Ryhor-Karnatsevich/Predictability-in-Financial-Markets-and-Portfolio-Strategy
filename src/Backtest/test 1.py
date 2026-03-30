@@ -3,6 +3,11 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
+# Additional configurations for pycharm console
+pd.set_option('display.max_columns', None)
+pd.set_option('display.width', 1000)
+pd.options.display.float_format = '{:.4f}'.format
+
 with open("../../Data/Results/garch_results.pkl", "rb") as f:
     results = pickle.load(f)
 
@@ -34,7 +39,7 @@ def run_backtest_comparison(results):
         # Inverse volatility: higher volatility = smaller position
         target_vol = 0.02  # Target daily volatility 2%
         position = target_vol / vol
-        position = position.clip(0, 2)  # Limit position to 0-2x
+        position = position.clip(0, 1)  # Limit position to 0-2x
         scaling_returns = position * returns
 
         # Calculate metrics
@@ -151,7 +156,3 @@ print(f"\nSharpe Improvement: {improved}/{total} tickers ({(improved / total) * 
 
 # results_df.to_csv("backtest_results.csv", index=False)
 # summary.to_csv("backtest_summary.csv")
-
-# ============================================
-# RUN
-# ============================================
