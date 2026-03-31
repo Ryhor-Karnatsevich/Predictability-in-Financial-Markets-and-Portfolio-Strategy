@@ -3,7 +3,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
 
-# --- Window settings ---
+# Window settings
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 pd.options.display.float_format = '{:.4f}'.format
@@ -48,7 +48,7 @@ def strategies_backtest(results, verbose=True):
         return_4 = weight_sma * returns
 
         # [5] Volatility Scaling + Momentum
-        momentum_sum = returns.rolling(20).sum()  # cumulative return 20 days
+        momentum_sum = returns.shift(1).rolling(20).sum()  # cumulative return 20 days
         trend_signal = (momentum_sum > 0).astype(float)  # 1 binary test
         weight_trend_scaling = position * trend_signal # Get position form [2]
         return_5 = weight_trend_scaling * returns
@@ -62,11 +62,11 @@ def strategies_backtest(results, verbose=True):
 
         # Dictionary with return and weight for final table
         strategies = {
-            "Fixed (B&H)": (return_1, weight_fixed),
-            "Vol Scaling (TVS)": (return_2, position),
-            "Vol Switch": (return_3, weight_filter),
-            "Vol Smart (SMA)": (return_4, weight_sma),
-            "Vol Scaling & Switch": (return_5, weight_trend_scaling)
+            "Buy & Hold": (return_1, weight_fixed),
+            "Target Volatility Scaling (TVS)": (return_2, position),
+            "Volatility Filter (MA50)": (return_3, weight_filter),
+            "Volatility Ratio (MA20)": (return_4, weight_sma),
+            "TVS + Momentum Filter": (return_5, weight_trend_scaling)
         }
 
         # Another subiteration to add values to final table and to plot dictionary
@@ -111,10 +111,10 @@ def strategies_backtest(results, verbose=True):
             axes[0, 1].grid(True, alpha=0.3)
 
             # Plot 3: Dynamic Weights (TVS vs Smart)
-            axes[1, 0].plot(position, label="Vol Scaling (TVS)", alpha=0.6, color='C0')
-            # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C10')                    # not the best option
-            axes[1, 0].plot(weight_sma, label="Vol Smart (SMA)", alpha=0.6, color='C2')
-            # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C30')   # not the best option
+            axes[1, 0].plot(position, label="Vol Scaling (TVS)", alpha=0.6, color='C1')
+            # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C2')                    # not the best option
+            axes[1, 0].plot(weight_sma, label="Vol Smart (SMA)", alpha=0.6, color='C3')
+            # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C0')   # not the best option
             axes[1, 0].axhline(y=1, color='black', linestyle='--', alpha=0.5)
             axes[1, 0].set_title("Position Size")
             axes[1, 0].set_ylim(-0.1, 1.1)
@@ -137,16 +137,15 @@ def strategies_backtest(results, verbose=True):
     #-----------------------------------------------------------------------------------------------
     # Created dataframe from dictionary with a ticker as a key and series as a value
     df_corr = pd.DataFrame(strat_returns_dict).corr()
-    print("\n" + "=" * 80)
-    print("CORRELATION MATRIX")
-    print("=" * 80)
+    print("\n" + "=" * 70)
+    print("CORRELATION MATRIX".center(70))
+    print("=" * 70)
     with pd.option_context('display.float_format', '{:.2f}'.format):
         print(df_corr)
-
     # Mean correlation excluding the diagonal
     mean_corr = (df_corr.sum().sum() - len(df_corr)) / (len(df_corr) ** 2 - len(df_corr))
-    print(f"Average Correlation: {mean_corr:.2f}")
-    # -----------------------------------------------------------------------------------------------
+    print("\n" + f"Average Correlation: {mean_corr:.2f}")
+    #-----------------------------------------------------------------------------------------------
 
     return pd.DataFrame(all_metrics)
 
@@ -180,10 +179,9 @@ def calculate_metrics(returns_series, equity_series):
 
 
 # EXECUTION
-results_df = strategies_backtest(results, verbose=False)
+results_df = strategies_backtest(results, verbose=True)
 
-
-# FINAL SUMMARY TABLE PRINTING
+# FINAL SUMMARY TABLE
 summary = results_df.groupby("Strategy").agg({
     "Total Return": "mean",
     "Sharpe": "mean",
@@ -192,23 +190,20 @@ summary = results_df.groupby("Strategy").agg({
     "Hit Ratio": "mean"
 }).sort_values("Sharpe", ascending=False)
 
-print("\n" + "=" * 80)
-print("AVERAGE PERFORMANCE OF STRATEGIES")
-print("=" * 80)
-print("=" * 80)
+# Adding Outperformance column
+win_rates = {}
+pivot = results_df.pivot(index='Ticker', columns='Strategy', values='Sharpe')
+for strategy in summary.index:
+    if strategy != "Buy & Hold":
+        wins = (pivot[strategy] > pivot["Buy & Hold"]).sum()
+        win_rates[strategy] = f"{wins}/{len(pivot)} ({wins/len(pivot):.1%})"
+summary["Outperformance (vs B&H)"] = summary.index.map(lambda x: win_rates.get(x, "-"))
+
+# Final printing
+print("\n" + "=" * 103)
+print("AVERAGE PERFORMANCE OF STRATEGIES".center(103))
+print("=" * 103)
 print_summary = summary.copy()
 print_summary["Hit Ratio"] = print_summary["Hit Ratio"].apply(lambda x: f"{x:.2f}")
 print(print_summary)
-
-
-
-# Performance Check
-pivot = results_df.pivot(index='Ticker', columns='Strategy', values='Sharpe')
-print("\n" + "=" * 80)
-print("STRATEGY WIN RATES (Sharpe > Buy & Hold)")
-for col in [c for c in pivot.columns if c != "Fixed (B&H)"]:
-    wins = (pivot[col] > pivot["Fixed (B&H)"]).sum()
-    total = len(pivot)
-    print(f"{col}: {wins}/{total} tickers ({wins / total:.1%})")
-
 
