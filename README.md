@@ -428,14 +428,8 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 - The combination of volatility targeting and momentum filtering consistently delivers superior results across assets.
 - TVS + Momentum Filter achieves the highest Sharpe ratio and strong return while maintaining controlled drawdowns.
 - It also demonstrates stable outperformance across the majority of tickers.
-- Based on these results, **"TVS + Momentum"** Filter is selected for further development and refinement in the next section.
+- Based on the results, **Target Volatility Scaling (TVS)** was selected as the foundation for further development due to its theoretical clarity and strong risk-adjusted characteristics.
 
 
-## "TVS + Momentum" Backtest improvement
+## "Target Volatility Scaling (TVS)" Backtest improvement
 
-
-### Backtest
-2. Choose best one and Run it, try different variations and choose best parameters.
-3. Robustness: different periods, stocks. and sensivity. 
-4. portfolio maybe.
-0. already have chosen 10 popular stocks.
