@@ -356,6 +356,77 @@ In total, 9 model configurations were evaluated for each stock.
 - Only a subset of stocks was used due to computational constraints
 
 
+## Backtest
+
+The goal of that part is to implement EGARCH(2,1) model into four strategies, choose the best one for further improving. 
+
+### Strategies Comparison
+
+**Method**
+- Gets trained models for chosen list of stock from last iteration in "GARCH" script.
+- Tickers list =  [AAPL, GILD, GOOGL, MSFT, AMZN, MLPI, PEP, COST, CSCO, AMGN]
+- Selected stocks are liquid large-cap equities with sufficient historical data and low Relative MAE: (0.65–0.86).
+- Evaluates 5 strategies:
+    - [1] "Buy & Hold" as a baseline for other strategies.
+    - [2] "Target Volatility Scaling (TVS)". Uses constant volatility equal 2% to change size of the position.
+    - [3] "Volatility Filter". Has two conditions - in/out of the market. Effected by MA_50 of volatility.
+    - [4] "Volatility Ratio". Uses MA_20 of volatility as a target to change size of the position. (dynamic TVS)
+    - [5] "TVS + Momentum Filter". Combines basic TVS and 20 days momentum of returns as a Filter with two conditions.
+- Used no leverage to make equal conditions. 
+
+**Evaluation Metrics**
+- Matrix:
+    - Correlation matrix of used stocks to check if they are not too tight connected. Returns used as a values.
+    - Average Correlation - average values of all values excluding diagonal ones.
+  - Average Performance of Strategies:
+      - Total Return - basic metric to grade the efficiency of strategy.
+      - Sharpe - return/risk
+      - Max Drawdown - shows how strategy managed with declines.
+      - Annual Volatility - shows how strategy reduces overall volatility.
+      - Hit Ratio - probability for strategy to have profitable daily return.
+      - Outperformance (vs B&H) - (Sharp of strategy > Sharpe of baseline).
+
+**Graphics**
+- For each ticker, the backtest generates four comprehensive plots:
+    - Equity Curve: Visualizes cumulative returns and overall capital appreciation over the testing period.
+    - Drawdown Analysis: Evaluates risk resilience by showing how each strategy navigates and recovers from market declines.
+    - Dynamic Exposure (Position Sizing): Displays the evolving leverage for continuous scaling strategies (2 & 4). Note: Binary filters (3 & 5) are excluded from this plot due to their 0/1 step-function nature.
+    - Volatility Diagnostics: Compares GARCH-predicted volatility (red) against realized absolute returns (gray) to assess model accuracy and responsiveness.
+
+---
+
+![MLPI](Pictures/strategies comparison.png)
+
+---
+
+### Interpretation
+- Matrix shows that stocks have median correlation. They don't behave like one, but have same trend.  
+- That means further strategies comparison can be proceeded. 
+- Strategies:
+  - "TVS + Momentum Filter" achieved the highest Sharpe ratio (0.71) and lowest drawdown (-14%), indicating strong risk-adjusted performance.
+  - However, it outperforms Buy & Hold only in 50% of cases, suggesting instability across assets.
+  - Volatility Ratio (MA20) shows the most consistent performance (60% outperformance), acting as a stable dynamic allocation strategy.
+  - Target Volatility Scaling (TVS) reduces volatility and slightly improves return.
+  - Volatility Filter (MA50) significantly reduces drawdowns but sacrifices returns.
+
+---
+
+![MLPI](Pictures/CSCO_strategies.png)
+
+---
+
+### Visual Analysis
+- Screenshot of one of ten boards.
+- ???
+
+### Conclusion
+- ???
+- 
+
+
+
+
+
 ### Backtest
 2. Choose best one and Run it, try different variations and choose best parameters.
 3. Robustness: different periods, stocks. and sensivity. 
