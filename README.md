@@ -431,7 +431,7 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 - Based on these results, **"TVS + Momentum"** Filter is selected for further development and refinement in the next section.
 
 
-
+## "TVS + Momentum" Backtest improvement
 
 
 ### Backtest
