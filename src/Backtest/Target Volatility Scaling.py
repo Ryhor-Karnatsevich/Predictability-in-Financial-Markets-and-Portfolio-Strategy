@@ -2,15 +2,35 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import pickle
+import polars as pl
 
 # Window settings
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 pd.options.display.float_format = '{:.4f}'.format
 
-# Import data
+# Import model
 with open("../../Data/Results/garch_results.pkl", "rb") as f:
     results = pickle.load(f)
+
+# Extract Tickers
+ticker_list = [r["summary"]["Ticker"] for r in results]
+
+#=====================================================
+# Fast csv import and filtration to add close column
+path = r"../../Data/Main Data/all_stocks_analysis.csv"
+df = (
+    pl.scan_csv(path)
+    .select(["Date", "Ticker", "Close"])
+    .filter(
+        (pl.col("Ticker").is_in(ticker_list)) &
+        (pl.col("Date") > "2018-06-01")
+    )
+    .collect()
+)
+df_pandas = df.to_pandas()
+#=====================================================
+
 
 
 # Strategies Function
@@ -33,14 +53,14 @@ def strategies_backtest(results, verbose=True):
         # ====================================================================================================
 
         target_vol = 0.02
-        position = (target_vol / vol).clip(0, 2)  # Твой исходный расчет
+        position = (target_vol / vol).clip(0, 2)
 
-        ret_raw = position * returns
+        return_raw = position * returns
 
         trades = position.diff().abs().fillna(0)
         comm_rate = 0.0005
 
-        ret_net = ret_raw - (trades * comm_rate)
+        return_net = return_raw - (trades * comm_rate)
 
         # ====================================================================================================
         # ====================================================================================================
@@ -49,7 +69,7 @@ def strategies_backtest(results, verbose=True):
         # Dictionary with return and weight for final table
         strategies = {
             "Buy & Hold": (return_fixed, weight_fixed),
-            "Target Volatility Scaling (TVS)": (ret_net, position)
+            "Target Volatility Scaling (TVS)": (return_net, position)
         }
 
         # Another subiteration to add values to final table and to plot dictionary
@@ -96,7 +116,7 @@ def strategies_backtest(results, verbose=True):
             # Plot 3: Dynamic Weights (TVS vs Smart)
             axes[1, 0].plot(position, label="Target Volatility Scaling (TVS)", alpha=0.6, color='C1')
             # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C2')                    # not the best option
-            axes[1, 0].plot(weight_sma, label="Volatility Ratio (MA20)", alpha=0.6, color='C3')
+
             # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C0')   # not the best option
             axes[1, 0].axhline(y=1, color='black', linestyle='--', alpha=0.5)
             axes[1, 0].set_title("Position Size")
