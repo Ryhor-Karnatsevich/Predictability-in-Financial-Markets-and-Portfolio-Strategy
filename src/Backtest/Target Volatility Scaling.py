@@ -25,48 +25,31 @@ def strategies_backtest(results, verbose=True):
         returns = r["series"]["returns"] / 100
         vol = r["series"]["volatility"] / 100
 
-
-        ### STRATEGIES
-        #----------------------------------------------------------------------------------
         # [1] "Buy & Hold" strategy
         weight_fixed = pd.Series(1, index=returns.index)
-        return_1 = weight_fixed * returns
+        return_fixed = weight_fixed * returns
+        #====================================================================================================
+        # ====================================================================================================
+        # ====================================================================================================
 
-        # [2] Volatility Scaling strategy (Risk Reduction)
         target_vol = 0.02
-        position = (target_vol / vol).clip(0, 2)  # No leverages, 0-1x
-        return_2 = position * returns
+        position = (target_vol / vol).clip(0, 2)  # Твой исходный расчет
 
-        # [3] Volatility Filter (binary switch)
-        threshold = vol.rolling(window=50).mean()
-        weight_filter = (vol < threshold).astype(float)  # binary test
-        return_3 = weight_filter * returns
+        ret_raw = position * returns
 
-        # [4] SMA based strategy
-        volatility_sma = vol.rolling(window=20).mean()  # SMA_20
-        weight_sma = (volatility_sma / vol).clip(0, 2)
-        return_4 = weight_sma * returns
+        trades = position.diff().abs().fillna(0)
+        comm_rate = 0.0005
 
-        # [5] Volatility Scaling + Momentum
-        momentum_sum = returns.shift(1).rolling(20).sum()  # cumulative return 20 days
-        trend_signal = (momentum_sum > 0).astype(float)  # 1 binary test
-        weight_trend_scaling = position * trend_signal # Get position form [2]
-        return_5 = weight_trend_scaling * returns
-        #----------------------------------------------------------------------------------
+        ret_net = ret_raw - (trades * comm_rate)
 
-
-
-        ### METRICS
-        # Store returns for further correlating matrix creating
-        strat_returns_dict[ticker] = return_1
+        # ====================================================================================================
+        # ====================================================================================================
+        # ====================================================================================================
 
         # Dictionary with return and weight for final table
         strategies = {
-            "Buy & Hold": (return_1, weight_fixed),
-            "Target Volatility Scaling (TVS)": (return_2, position),
-            "Volatility Filter (MA50)": (return_3, weight_filter),
-            "Volatility Ratio (MA20)": (return_4, weight_sma),
-            "TVS + Momentum Filter": (return_5, weight_trend_scaling)
+            "Buy & Hold": (return_fixed, weight_fixed),
+            "Target Volatility Scaling (TVS)": (ret_net, position)
         }
 
         # Another subiteration to add values to final table and to plot dictionary
@@ -132,21 +115,6 @@ def strategies_backtest(results, verbose=True):
             plt.show()
     ### END of iterations
 
-
-    # Correlation Matrix
-    #-----------------------------------------------------------------------------------------------
-    # Created dataframe from dictionary with a ticker as a key and series as a value
-    df_corr = pd.DataFrame(strat_returns_dict).corr()
-    print("\n" + "=" * 70)
-    print("CORRELATION MATRIX".center(70))
-    print("=" * 70)
-    with pd.option_context('display.float_format', '{:.2f}'.format):
-        print(df_corr)
-    # Mean correlation excluding the diagonal
-    mean_corr = (df_corr.sum().sum() - len(df_corr)) / (len(df_corr) ** 2 - len(df_corr))
-    print("\n" + f"Average Correlation: {mean_corr:.2f}")
-    #-----------------------------------------------------------------------------------------------
-
     return pd.DataFrame(all_metrics)
 
 
@@ -206,4 +174,3 @@ print("=" * 103)
 print_summary = summary.copy()
 print_summary["Hit Ratio"] = print_summary["Hit Ratio"].apply(lambda x: f"{x:.2f}")
 print(print_summary)
-
