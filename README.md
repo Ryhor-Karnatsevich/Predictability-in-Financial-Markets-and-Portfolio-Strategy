@@ -433,3 +433,27 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 
 ## "Target Volatility Scaling (TVS)" Backtest improvement
 
+"Buy & Hold":
+- 0.05% commission for first and last day. Needed to recreate real trading conditions.
+
+TVS with transaction and margin costs:
+- target volatility = 2%
+- transaction costs = 0.05%
+- leverage margin costs = 5% annually
+
+TVS Advanced:
+  Basic:
+    - target volatility = 2%
+    - transaction costs = 0.05%
+    - leverage margin costs = 5% annually
+  Advanced:
+    - Limited volatility flour to 1.25% . 
+    - Assymetric target based on SMA200 (2% if >, 1% if not)
+    - Volatility Risk Premium Offset (get into account 0.8 * volatility)
+    - Rebalancing Threshold (Only update position if the change is greater than 3.5% )
+
+
+garch testing
+- grid verbose false - okay ,csv good
+
+

@@ -32,9 +32,9 @@ save = False
 ### SETUP
 MODE = "FINAL"
 split_date_grid = "2019-01-01"
-split_dates = ["2010-01-01", "2017-01-01", "2019-01-01"]
+split_dates = ["2010-01-01", "2017-01-01", "2019-01-01"] #["2010-01-01", "2017-01-01", "2019-01-01"]
 use_random = False
-n = 2
+n = 20
 # configurations for FINAL MODE
 CONFIGS = {
     "DEFAULT": {"type": "EGARCH", "p": 2, "q": 1}
@@ -208,6 +208,8 @@ elif MODE == "FINAL":
         all_final_metrics.append(period_final_df)
         print(f"\n--- Results for Period: {split_date} ---")
         print(period_final_df.round(4))
+
+        all_summary_dfs.append(period_final_df)
 
 
         all_summary_dfs.append(results_df)
