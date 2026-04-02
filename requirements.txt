@@ -5,3 +5,5 @@ statsmodels
 arch
 scikit-learn
 joblib
+polars
+

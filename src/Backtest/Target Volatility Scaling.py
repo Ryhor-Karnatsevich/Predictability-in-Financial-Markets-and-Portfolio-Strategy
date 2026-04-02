@@ -28,7 +28,9 @@ df = (
     )
     .collect()
 )
-df_pandas = df.to_pandas()
+df = df.to_pandas()
+prices_pivot = df.pivot(index="Date", columns="Ticker", values="Close")
+prices_pivot.index = pd.to_datetime(prices_pivot.index)
 #=====================================================
 
 
@@ -43,24 +45,85 @@ def strategies_backtest(results, verbose=True):
     for r in results:
         ticker = r["summary"]["Ticker"]
         returns = r["series"]["returns"] / 100
-        vol = r["series"]["volatility"] / 100
+        volatility = r["series"]["volatility"] / 100
 
         # [1] "Buy & Hold" strategy
+        fixed_fee = 0.0005
         weight_fixed = pd.Series(1, index=returns.index)
         return_fixed = weight_fixed * returns
-        #====================================================================================================
+        return_fixed.iloc[0] -= fixed_fee
+        return_fixed.iloc[-1] -= fixed_fee
+
+        # [2] "TVS with transaction and margin costs"
+        # Costs Setup
+        target_0 = 0.02
+        margin_annual_rate_0 = 0.05  # 5% annually for leverage
+        margin_daily_rate_0 = margin_annual_rate_0 / 252
+        comm_rate_0 = 0.0005  # 0.05% - transaction cost
+        # Raw return
+        position_basic = (target_0 / volatility).clip(0, 2)
+        return_raw_basic = position_basic * returns
+        # Transaction Costs
+        trades_basic = position_basic.diff().abs().fillna(0)
+        commissions_0 = trades_basic * comm_rate_0
+        # Margin Costs
+        leverage_used_0 = (position_basic - 1).clip(lower=0)
+        margin_costs_0 = leverage_used_0 * margin_daily_rate_0
+        # Final Return
+        return_net_basic = return_raw_basic - commissions_0 - margin_costs_0
+
         # ====================================================================================================
         # ====================================================================================================
+        # ====================================================================================================
 
-        target_vol = 0.02
-        position = (target_vol / vol).clip(0, 2)
 
-        return_raw = position * returns
-
-        trades = position.diff().abs().fillna(0)
+        #--------------------------------------------------
+        # 1  Setup: Leverage, Costs and Prices
+        leverage = 2
+        vol_discount = 0.8 # value to offset predicted volatility, if it is overrated
+        rebalance = 0.035 # value for rebalancing threshold
         comm_rate = 0.0005
+        margin_daily_rate = 0.05 / 252 # annual rate / trading days
+        ticker_prices = prices_pivot[ticker].reindex(returns.index)
+        volatility = volatility.clip(lower=0.0125) # limit flour for volatility
 
-        return_net = return_raw - (trades * comm_rate)
+        # 2  Asymmetric Target (based on sma_200)
+        sma200 = ticker_prices.rolling(200).mean().shift(1)
+        volatility_target = np.where(ticker_prices > sma200, 0.02, 0.01)
+
+        # 3  Volatility Risk Premium Offset
+        raw_position = (volatility_target / (volatility * vol_discount)).clip(0, leverage)
+
+        # 4  Rebalancing Threshold (Cutting unnecessary turnover & slippage)
+        position = raw_position.copy()
+        for i in range(1, len(position)):
+            # Only update position if the change is greater than 5%
+            if abs(raw_position.iloc[i] - position.iloc[i - 1]) < rebalance:
+                position.iloc[i] = position.iloc[i - 1]
+
+        # 5  Drawdown Protection (Circuit Breaker)
+        # Calculating equity and drawdown to adjust position risk
+        temp_returns = position * returns
+        equity_temp = (1 + (temp_returns)).cumprod()
+        drawdown_temp = equity_temp / equity_temp.cummax() - 1
+        risk_multiplier = np.where(drawdown_temp < -0.1, 0.5, 1.0)
+        risk_multiplier = pd.Series(risk_multiplier, index=position.index).shift(1).fillna(1.0)
+        position = position * risk_multiplier
+
+
+        # 6  Returns & Execution Costs
+        return_raw = position * returns
+        trades = position.diff().abs().fillna(0)
+        commissions = trades * comm_rate
+
+        # 7 Margin Costs (Cost of Leverage)
+        leverage_used = (position - 1).clip(lower=0)
+        margin_costs = leverage_used * margin_daily_rate
+
+
+
+        # 8 Final Net Return for Optimized Strategy
+        return_net = return_raw - commissions - margin_costs
 
         # ====================================================================================================
         # ====================================================================================================
@@ -69,6 +132,7 @@ def strategies_backtest(results, verbose=True):
         # Dictionary with return and weight for final table
         strategies = {
             "Buy & Hold": (return_fixed, weight_fixed),
+            "TVS with transaction and margin costs": (return_net_basic,position_basic),
             "Target Volatility Scaling (TVS)": (return_net, position)
         }
 
