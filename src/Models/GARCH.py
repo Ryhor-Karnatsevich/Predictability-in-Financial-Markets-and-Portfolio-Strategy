@@ -17,6 +17,9 @@ path = r"../../Data/Main Data/all_stocks_analysis.csv"
 df = pd.read_csv(path)
 df["Date"] = pd.to_datetime(df["Date"])
 df = df.sort_values(["Ticker", "Date"])
+all_series_data = []
+all_summary_dfs = []
+all_final_metrics = []
 #Filter
 min_obs = 500
 df = df.groupby("Ticker").filter(lambda x: len(x) >= min_obs)
@@ -28,9 +31,10 @@ np.random.seed(52)
 save = False
 ### SETUP
 MODE = "FINAL"
-split_date = "2019-01-01"
+split_date_grid = "2019-01-01"
+split_dates = ["2010-01-01", "2017-01-01", "2019-01-01"]
 use_random = False
-n = 100
+n = 2
 # configurations for FINAL MODE
 CONFIGS = {
     "DEFAULT": {"type": "EGARCH", "p": 2, "q": 1}
@@ -41,7 +45,6 @@ if use_random:
     tickers = np.random.choice(df["Ticker"].unique(), size=n, replace=False)
 else:
     tickers = ["AAPL", "GILD","GOOGL","MSFT","AMZN","MLPI","PEP","COST","CSCO","AMGN"]
-#["AAPL", "NVDA","GOOGL","MSFT","META","AMZN","MLPI"]
 
 ### GARCH Model
 def garch_run(df,ticker,split_date,type,p,q,verbose=True):
@@ -155,8 +158,6 @@ def garch_run(df,ticker,split_date,type,p,q,verbose=True):
     }
 
 # I used Parallel calculation to reduce some run time. It is about 5-10% on a small sample.
-
-# GRID mode is for comparing models and their parameters with each other on a stock sample.
 if MODE == "GRID":
     tasks = [(ticker, v, p, q)
              for ticker in tickers
@@ -164,60 +165,76 @@ if MODE == "GRID":
              for p, q in [(1, 1), (2, 1),(1,2)]]
 
     results = Parallel(n_jobs=-1)(
-        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
+        delayed(garch_run)(df, ticker, split_date_grid, type=v, p=p, q=q, verbose=False)
         for ticker, v, p, q in tasks
     )
-    results = [r for r in results if r is not None]
-    results_df = pd.DataFrame([r["summary"] for r in results])
-    results_df = pd.DataFrame(results).sort_values(["Ticker", "AIC"])
 
-# This mode is for calculating chosen model after GRID TEST.
-# It best suitable for big samples of stocks and for testing the model.
+    results = [r for r in results if r is not None]
+    grid_df = pd.DataFrame([r["summary"] for r in results])
+    if not grid_df.empty:
+        grid_df = grid_df.sort_values(["Ticker", "AIC"])
+        all_summary_dfs.append(grid_df)
+        print(grid_df.round(4))
+
 elif MODE == "FINAL":
-    tasks = [(ticker, CONFIGS.get(ticker, CONFIGS["DEFAULT"])["type"],
-              CONFIGS.get(ticker, CONFIGS["DEFAULT"])["p"],
-              CONFIGS.get(ticker, CONFIGS["DEFAULT"])["q"])
-             for ticker in tickers]
+    for split_date in split_dates:
+        tasks = [(ticker, CONFIGS.get(ticker, CONFIGS["DEFAULT"])["type"],
+                  CONFIGS.get(ticker, CONFIGS["DEFAULT"])["p"],
+                  CONFIGS.get(ticker, CONFIGS["DEFAULT"])["q"])
+                 for ticker in tickers]
 
-    results = Parallel(n_jobs=-1)(
-        delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
-        for ticker, v, p, q in tasks
-    )
-    results = [r for r in results if r is not None]
-    results_df = pd.DataFrame([r["summary"] for r in results])
+        results = Parallel(n_jobs=-1)(
+            delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
+            for ticker, v, p, q in tasks
+        )
+        results = [r for r in results if r is not None]
+        for r in results:
+            r["summary"]["Period"] = split_date
+            all_series_data.append(r)
+        results_df = pd.DataFrame([r["summary"] for r in results])
+        # Final row with averages
+        avg_row = results_df.mean(numeric_only=True)
+        avg_row["Ticker"] = "AVERAGE"
+        avg_row["Period"] = split_date
+        avg_row["Model"] = results_df["Model"].iloc[0]
+        avg_row["p"] = results_df["p"].iloc[0]
+        avg_row["q"] = results_df["q"].iloc[0]
+        avg_row["converged"] = f"{results_df['converged'].mean() * 100:.1f}%"
+        results_df = results_df.sort_values("Relative MAE")
+        period_final_df = pd.concat([results_df, pd.DataFrame([avg_row])], ignore_index=True)
+        period_final_df["train size"] = period_final_df["train size"].round(0).astype(int)
+        period_final_df["test size"] = period_final_df["test size"].round(0).astype(int)
+
+        all_final_metrics.append(period_final_df)
+        print(f"\n--- Results for Period: {split_date} ---")
+        print(period_final_df.round(4))
+
+
+        all_summary_dfs.append(results_df)
 else:
     print("WRONG MODE")
 
 
-# Final row with averages
-if MODE == "FINAL" and not results_df.empty:
-    avg_row = results_df.mean(numeric_only=True)
-    avg_row["Ticker"] = "AVERAGE"
-    avg_row["Model"] = results_df["Model"].iloc[0]
-    avg_row["p"] = results_df["p"].iloc[0]
-    avg_row["q"] = results_df["q"].iloc[0]
-    avg_row["converged"] = f"{results_df['converged'].mean() * 100:.1f}%"
-    results_df = results_df.sort_values("Relative MAE")
-    results_df = pd.concat([results_df, pd.DataFrame([avg_row])], ignore_index=True)
-    results_df["train size"] = results_df["train size"].round(0).astype(int)
-    results_df["test size"] = results_df["test size"].round(0).astype(int)
+final_metrics_df = pd.concat(all_summary_dfs, ignore_index=True)
 
-print(results_df.round(4))
 
 # Saving results to csv
 if MODE == "GRID":
     output_path = r"../../Data/Results/GRID.csv"
 else:
     output_path = r"../../Data/Results/FINAL.csv"
-if save:
-    results_df.to_csv(output_path, index=False)
+if all_summary_dfs:
+    final_metrics_df = pd.concat(all_summary_dfs, ignore_index=True)
+    if save:
+        final_metrics_df.to_csv(output_path, index=False)
+
+
 # Adding time for optimization comparison
 end_time = time.time()
 run_time = end_time - start_time
 print(f"\n Run Time : {run_time:.2f} seconds")
 
 
-
 import pickle
 with open("../../Data/Results/garch_results.pkl", "wb") as f:
-    pickle.dump(results, f)
+    pickle.dump(all_series_data, f)
