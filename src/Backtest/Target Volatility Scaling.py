@@ -16,8 +16,8 @@ with open("../../Data/Results/garch_results.pkl", "rb") as f:
 # Extract unique periods and create mapping
 periods = sorted(set(r["summary"]["Period"] for r in results))
 print(f"Periods found: {periods}")
+target_periods = ['2007-06-01','2015-06-01','2018-06-01']
 
-# Extract Tickers for given period (use first period to get tickers)
 ticker_list = list(set(r["summary"]["Ticker"] for r in results))
 
 # =====================================================
@@ -35,27 +35,28 @@ df = (
 df = df.to_pandas()
 prices_pivot = df.pivot(index="Date", columns="Ticker", values="Close")
 prices_pivot.index = pd.to_datetime(prices_pivot.index)
-
-
 # =====================================================
 
 
-# Strategies Function
-def strategies_backtest(results, period_filter=None, verbose=True):
-    all_metrics = []  # For average performances
-    strat_returns_dict = {}  # For corr matrix
-    plot_data = {}  # To store data for Plots
+def strategies_backtest(results, period_filter=None, verbose=False,
+                        rebalance=0.035, vol_discount=0.8):
 
-    # Filter results by period if specified
+    all_metrics = []
+
     if period_filter:
         results = [r for r in results if r["summary"]["Period"] == period_filter]
 
-    # Begins iterating on shares [ STRATEGIES, METRICS, VISUALIZATION ]
     for r in results:
         ticker = r["summary"]["Ticker"]
         returns = r["series"]["returns"] / 100
         volatility = r["series"]["volatility"] / 100
         period = r["summary"]["Period"]
+
+        # cutting test to 2 years
+        start_dt = pd.to_datetime(period)
+        end_dt = start_dt + pd.DateOffset(years=2)
+        returns = returns[returns.index <= end_dt]
+        volatility = volatility[volatility.index <= end_dt]
 
         # [1] "Buy & Hold" strategy
         fixed_fee = 0.0005
@@ -153,57 +154,8 @@ def strategies_backtest(results, period_filter=None, verbose=True):
                     "Ticker": ticker,
                     "Period": period,
                     "Strategy": name,
-                    **metrics  # from function "calculate_metrics"
+                    **metrics # from function "calculate_metrics"
                 })
-                # Adding data to list to create plots
-                plot_data[name] = {
-                    "equity": equity,
-                    "drawdown": equity / equity.cummax() - 1,
-                    "weight": weight
-                }
-
-        ### VISUALIZATION
-        # ------------------------------------------------------------------------------------------------
-        if verbose:
-            # Setup for one board with 4 plots
-            fig, axes = plt.subplots(2, 2, figsize=(16, 10))
-            fig.suptitle(f"Strategies Comparison for : {ticker} (Period: {period})", fontsize=16)
-
-            # Plot 1: Equity Curves
-            for name, data in plot_data.items():
-                axes[0, 0].plot(data["equity"], label=name, alpha=0.9)
-            axes[0, 0].set_title("Equity Curves (Cumulative Return)")
-            axes[0, 0].legend()
-            axes[0, 0].grid(True, alpha=0.3)
-
-            # Plot 2: Drawdowns
-            for name, data in plot_data.items():
-                axes[0, 1].fill_between(data["drawdown"].index, data["drawdown"], 0, alpha=0.3, label=name)
-            axes[0, 1].set_title("Drawdowns")
-            axes[0, 1].legend()
-            axes[0, 1].grid(True, alpha=0.3)
-
-            # Plot 3: Dynamic Weights (TVS vs Smart)
-            axes[1, 0].plot(position, label="Target Volatility Scaling (TVS)", alpha=0.6, color='C1')
-            # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C2')                    # not the best option
-
-            # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C0')   # not the best option
-            axes[1, 0].axhline(y=1, color='black', linestyle='--', alpha=0.5)
-            axes[1, 0].set_title("Position Size")
-            axes[1, 0].set_ylim(-0.1, 1.1)
-            axes[1, 0].legend()
-            axes[1, 0].grid(True, alpha=0.3)
-
-            # Plot 4: Volatility Diagnostics
-            axes[1, 1].plot(np.abs(returns), color='gray', alpha=0.3, label='Realized |Return|')
-            axes[1, 1].plot(volatility, color='red', alpha=0.8, label='EGARCH Predicted Volatility')
-            axes[1, 1].set_title("Volatility Prediction vs |Returns|")
-            axes[1, 1].legend()
-            axes[1, 1].grid(True, alpha=0.3)
-
-            plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-            plt.show()
-    ### END of iterations
 
     return pd.DataFrame(all_metrics)
 
@@ -232,45 +184,153 @@ def calculate_metrics(returns_series, equity_series):
         "Hit Ratio": hit_ratio
     }
 
+# =========================================================
+# EXECUTION
+# =========================================================
 
-# ----------------------------------------------------------------------------------------------------------------------------------
+all_results = []
 
+rebalance_values = [0.02, 0.03, 0.035, 0.05]
+vol_discount_values = [0.6, 0.8, 1.0]
 
-# EXECUTION - Loop over periods
-all_period_results = []
+sensitivity_results = []
 
 for period in periods:
-    print(f"\n{'=' * 60}")
+
+    print("\n" + "="*60)
     print(f"Processing Period: {period}")
-    print(f"{'=' * 60}")
+    print("="*60)
 
-    results_df = strategies_backtest(results, period_filter=period, verbose=False)
+    filtered_results = [r for r in results if r["summary"]["Period"] == period]
 
-    if not results_df.empty:
-        all_period_results.append(results_df)
+    results_df = strategies_backtest(filtered_results)
+    results_df["Period"] = period
+    all_results.append(results_df)
 
-        # FINAL SUMMARY TABLE
-        summary = results_df.groupby("Strategy").agg({
-            "Total Return": "mean",
-            "Sharpe": "mean",
-            "Max Drawdown": "mean",
-            "Annual Vol": "mean",
-            "Hit Ratio": "mean"
-        }).sort_values("Sharpe", ascending=False)
+    for reb in rebalance_values:
+        for vd in vol_discount_values:
 
-        # Adding Outperformance column
-        win_rates = {}
-        pivot = results_df.pivot(index='Ticker', columns='Strategy', values='Sharpe')
-        for strategy in summary.index:
-            if strategy != "Buy & Hold":
-                wins = (pivot[strategy] > pivot["Buy & Hold"]).sum()
-                win_rates[strategy] = f"{wins}/{len(pivot)} ({wins / len(pivot):.1%})"
-        summary["Outperformance (vs B&H)"] = summary.index.map(lambda x: win_rates.get(x, "-"))
+            tmp_df = strategies_backtest(
+                filtered_results,
+                rebalance=reb,
+                vol_discount=vd
+            )
 
-        # Final printing
-        print("\n" + "=" * 103)
-        print(f"AVERAGE PERFORMANCE OF STRATEGIES FOR PERIOD {period}".center(103))
-        print("=" * 103)
-        print_summary = summary.copy()
-        print_summary["Hit Ratio"] = print_summary["Hit Ratio"].apply(lambda x: f"{x:.2f}")
-        print(print_summary)
+            if not tmp_df.empty:
+                tmp_df["Period"] = period
+                tmp_df["rebalance"] = reb
+                tmp_df["vol_discount"] = vd
+                sensitivity_results.append(tmp_df)
+
+final_df = pd.concat(all_results)
+sensitivity_df = pd.concat(sensitivity_results)
+
+# =========================================================
+# REGIME ANALYSIS
+# =========================================================
+
+regime_map = {
+    target_periods[0]: "2007-2009",
+    target_periods[1]: "2015-2017",
+    target_periods[2]: "2018-2020"
+}
+
+def map_regime(period):
+    return regime_map.get(period, "Other")
+# сначала фильтр
+regime_df = final_df[final_df["Period"].isin(target_periods)].copy()
+# потом создаём колонку
+regime_df["Regime"] = regime_df["Period"].apply(map_regime)
+
+regime_summary = regime_df.groupby(["Regime", "Strategy"]).agg({
+    "Total Return": "mean",
+    "Sharpe": "mean",
+    "Max Drawdown": "mean"
+})
+regime_summary = regime_summary.sort_values(
+    by=["Regime", "Sharpe"],
+    ascending=[True, False]
+)
+
+print("\n" + "="*103)
+print("REGIME ANALYSIS".center(103))
+print("="*103)
+print(regime_summary)
+
+# =========================================================
+# SENSITIVITY PLOT
+# =========================================================
+
+pivot = sensitivity_df.groupby(
+    ["rebalance", "vol_discount", "Strategy"]
+)["Sharpe"].mean().reset_index()
+
+pivot_tvs = pivot[pivot["Strategy"] == "Target Volatility Scaling (TVS)"]
+
+pivot_table = pivot_tvs.pivot(
+    index="rebalance",
+    columns="vol_discount",
+    values="Sharpe"
+)
+
+pivot_table.plot(figsize=(10,6))
+plt.title("Sensitivity of Sharpe to Parameters")
+plt.grid(True)
+plt.show()
+
+# =========================================================
+# FINAL SUMMARY
+# =========================================================
+
+summary = final_df.groupby("Strategy").agg({
+    "Total Return": "mean",
+    "Sharpe": "mean",
+    "Max Drawdown": "mean",
+    "Annual Vol": "mean",
+    "Hit Ratio": "mean"
+}).sort_values("Sharpe", ascending=False)
+
+# Adding Outperformance column
+win_rates = {}
+
+pivot = final_df.pivot_table(
+    index='Ticker',
+    columns='Strategy',
+    values='Sharpe'
+)
+
+for strategy in summary.index:
+    if strategy != "Buy & Hold":
+        wins = (pivot[strategy] > pivot["Buy & Hold"]).sum()
+        total = len(pivot)
+        win_rates[strategy] = f"{wins}/{total} ({wins / total:.1%})"
+
+summary["Outperformance (vs B&H)"] = summary.index.map(
+    lambda x: win_rates.get(x, "-")
+)
+#===============================================================================
+print("\n" + "=" * 103)
+print("AVERAGE PERFORMANCE ACROSS SELECTED PERIODS".center(103))
+print("=" * 103)
+print(summary)
+
+# Sharpe over time
+sharpe_over_time = final_df.groupby(["Period", "Strategy"])["Sharpe"].mean().unstack()
+sharpe_over_time.plot(figsize=(12, 6))
+plt.title("Sharpe Ratio Over Time")
+plt.grid(True)
+plt.show()
+
+# Drawdown over time
+dd_over_time = final_df.groupby(["Period", "Strategy"])["Max Drawdown"].mean().unstack()
+dd_over_time.plot(figsize=(12, 6))
+plt.title("Max Drawdown Over Time")
+plt.grid(True)
+plt.show()
+
+# Returns over time
+ret_over_time = final_df.groupby(["Period", "Strategy"])["Total Return"].mean().unstack()
+ret_over_time.plot(figsize=(12, 6))
+plt.title("Returns Over Time")
+plt.grid(True)
+plt.show()
