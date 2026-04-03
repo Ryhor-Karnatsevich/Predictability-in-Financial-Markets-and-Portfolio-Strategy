@@ -1,7 +1,6 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 import pickle
 import polars as pl
 
@@ -9,6 +8,9 @@ import polars as pl
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
 pd.options.display.float_format = '{:.4f}'.format
+def format_float(x):
+    return f'{x:.4f}' if pd.notna(x) else '-'
+pd.options.display.float_format = format_float
 
 # Import model
 with open("../../Data/Results/garch_results.pkl", "rb") as f:
@@ -38,7 +40,6 @@ prices_pivot = df.pivot(index="Date", columns="Ticker", values="Close")
 prices_pivot.index = pd.to_datetime(prices_pivot.index)
 # =====================================================
 
-
 def strategies_backtest(results, period_filter=None, verbose=False,
                         rebalance=0.035, vol_discount=0.8):
 
@@ -65,6 +66,8 @@ def strategies_backtest(results, period_filter=None, verbose=False,
         return_fixed = weight_fixed * returns
         return_fixed.iloc[0] -= fixed_fee
         return_fixed.iloc[-1] -= fixed_fee
+        turnover_fixed = 0
+        target = 0
 
         # [2] "TVS with transaction and margin costs"
         # Costs Setup
@@ -75,8 +78,9 @@ def strategies_backtest(results, period_filter=None, verbose=False,
         # Raw return
         position_basic = (target_0 / volatility).clip(0, 2)
         return_raw_basic = position_basic * returns
-        # Transaction Costs
+        # Transaction Costs and turnover
         trades_basic = position_basic.diff().abs().fillna(0)
+        turnover_basic = trades_basic.mean() * 252
         commissions_0 = trades_basic * comm_rate_0
         # Margin Costs
         leverage_used_0 = (position_basic - 1).clip(lower=0)
@@ -84,11 +88,9 @@ def strategies_backtest(results, period_filter=None, verbose=False,
         # Final Return
         return_net_basic = return_raw_basic - commissions_0 - margin_costs_0
 
-        # ====================================================================================================
-        # ====================================================================================================
-        # ====================================================================================================
 
-        # --------------------------------------------------
+        # ====================================================================================================
+        # [3] Target Volatility Scaling Advanced
         # 1  Setup: Leverage, Costs and Prices
         leverage = 2
         vol_discount = 0.8  # value to offset predicted volatility, if it is overrated
@@ -125,6 +127,7 @@ def strategies_backtest(results, period_filter=None, verbose=False,
         return_raw = position * returns
         trades = position.diff().abs().fillna(0)
         commissions = trades * comm_rate
+        turnover = trades.mean() * 252
 
         # 7 Margin Costs (Cost of Leverage)
         leverage_used = (position - 1).clip(lower=0)
@@ -139,15 +142,15 @@ def strategies_backtest(results, period_filter=None, verbose=False,
 
         # Dictionary with return and weight for final table
         strategies = {
-            "Buy & Hold": (return_fixed, weight_fixed),
-            "TVS with transaction and margin costs": (return_net_basic, position_basic),
-            "Target Volatility Scaling (TVS)": (return_net, position)
+            "Buy & Hold": (return_fixed, weight_fixed,turnover_fixed,None, None),
+            "TVS with transaction and margin costs": (return_net_basic, position_basic,turnover_basic,target_0,return_fixed),
+            "Target Volatility Scaling (TVS)": (return_net, position,turnover,volatility_target,return_fixed)
         }
 
         # Another subiteration to add values to final table and to plot dictionary
-        for name, (strategy_return, weight) in strategies.items():
+        for name, (strategy_return, weight,turnover,target,return_fixed) in strategies.items():
             equity = (1 + strategy_return).cumprod()  # creates equity curve (line of returns of all previous time)
-            metrics = calculate_metrics(strategy_return, equity)  # Use function that below
+            metrics = calculate_metrics(strategy_return, equity, turnover, target, return_fixed)  # Use function that below
 
             if metrics:
                 # Adding data to list for final table
@@ -163,7 +166,7 @@ def strategies_backtest(results, period_filter=None, verbose=False,
 
 # Function to calculate metrics
 # ----------------------------------------------------------------------------------------------------------------------------------
-def calculate_metrics(returns_series, equity_series):
+def calculate_metrics(returns_series, equity_series, turnover,target,return_fixed ):
     # Data cleaning
     returns_series = returns_series.replace([np.inf, -np.inf], np.nan).dropna()
     if len(returns_series) == 0:
@@ -176,14 +179,50 @@ def calculate_metrics(returns_series, equity_series):
     annual_vol = returns_series.std() * np.sqrt(252)  # Annual Volatility
     hit_ratio = (returns_series > 0).mean()  # Percentage of Days when strategy return > 0
 
+    # CVAR
+    percentile = 0.05
+    var = np.percentile(returns_series, percentile * 100)
+    cvar = returns_series[returns_series <= var].mean()
+
+
+    # Volatility Target Deviation
+    if target is not None:
+        realized_vol = returns_series.rolling(20).std()
+        if isinstance(target, pd.Series):
+            target_aligned = target.reindex(returns_series.index)
+        else:
+            target_aligned = pd.Series(target, index=returns_series.index)
+        vol_target_dev = np.nanmean(np.abs(realized_vol - target_aligned))
+    else:
+        vol_target_dev = np.nan
+
+
+    # Tail Risk Reduction
+    if return_fixed is not None:
+        bh_var = np.percentile(return_fixed, 5)
+        bh_cvar = return_fixed[return_fixed <= bh_var].mean()
+        if np.isnan(bh_cvar) or bh_cvar == 0:
+            tail_risk_reduction = np.nan
+        else:
+            tail_risk_reduction = (cvar - bh_cvar) / abs(bh_cvar)
+    else:
+        tail_risk_reduction = np.nan
+
+
     # That dictionary appends to ticker dictionary in all_metrics list
     return {
         "Total Return": total_return,
         "Sharpe": sharpe,
         "Max Drawdown": max_dd,
         "Annual Vol": annual_vol,
-        "Hit Ratio": hit_ratio
+        "Hit Ratio": hit_ratio,
+        "Turnover": turnover,
+        "CVaR": cvar,
+        "Vol Target Deviation": vol_target_dev,
+        "Tail Risk Reduction": tail_risk_reduction
     }
+
+
 
 # =========================================================
 # EXECUTION
@@ -227,26 +266,27 @@ final_df = pd.concat(all_results)
 sensitivity_df = pd.concat(sensitivity_results)
 
 # =========================================================
-# REGIME ANALYSIS
+# PERIODS ANALYSIS
 # =========================================================
 
-regime_map = {
+regime_df = final_df[final_df["Period"].isin(target_periods)].copy()
+regime_df["Regime"] = regime_df["Period"].map({
     target_periods[0]: "2007-2009",
     target_periods[1]: "2015-2017",
     target_periods[2]: "2018-2020"
-}
+}).fillna("Other")
 
-def map_regime(period):
-    return regime_map.get(period, "Other")
-# сначала фильтр
-regime_df = final_df[final_df["Period"].isin(target_periods)].copy()
-# потом создаём колонку
-regime_df["Regime"] = regime_df["Period"].apply(map_regime)
-
-regime_summary = regime_df.groupby(["Regime", "Strategy"]).agg({
+regime_summary = regime_df.groupby(["Periods", "Strategy"]).agg({
     "Total Return": "mean",
     "Sharpe": "mean",
-    "Max Drawdown": "mean"
+    "Max Drawdown": "mean",
+    "Annual Vol": "mean",
+    "Hit Ratio": "mean",
+    "Turnover": "mean",
+    "CVaR": "mean",
+    "Vol Target Deviation": "mean",
+    "Tail Risk Reduction": "mean"
+
 })
 regime_summary = regime_summary.sort_values(
     by=["Regime", "Sharpe"],
@@ -254,7 +294,7 @@ regime_summary = regime_summary.sort_values(
 )
 
 print("\n" + "="*103)
-print("REGIME ANALYSIS".center(103))
+print("3 PERIODS ANALYSIS".center(103))
 print("="*103)
 print(regime_summary)
 
@@ -288,7 +328,11 @@ summary = final_df.groupby("Strategy").agg({
     "Sharpe": "mean",
     "Max Drawdown": "mean",
     "Annual Vol": "mean",
-    "Hit Ratio": "mean"
+    "Hit Ratio": "mean",
+    "Turnover": "mean",
+    "CVaR": "mean",
+    "Vol Target Deviation": "mean",
+    "Tail Risk Reduction": "mean"
 }).sort_values("Sharpe", ascending=False)
 
 # Adding Outperformance column
