@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+import seaborn as sns
 import pickle
 import polars as pl
 
@@ -37,9 +38,10 @@ prices_pivot.index = pd.to_datetime(prices_pivot.index)
 # =====================================================
 
 def strategies_backtest(results, period_filter=None, verbose=False,
-                        rebalance=0.035, vol_discount=0.8):
+                        rebalance=0.035, vol_discount=0.8, sma_window=200):
 
     all_metrics = []
+    diagnostic_positions = [] # for sensitivity plot
 
     if period_filter:
         results = [r for r in results if r["summary"]["Period"] == period_filter]
@@ -89,16 +91,16 @@ def strategies_backtest(results, period_filter=None, verbose=False,
         # [3] Target Volatility Scaling Advanced
         # 1  Setup: Leverage, Costs and Prices
         leverage = 2
-        vol_discount = 0.8  # value to offset predicted volatility, if it is overrated
-        rebalance = 0.035  # value for rebalancing threshold
+        # vol_discount = 0.8  # value to offset predicted volatility, if it is overrated
+        # rebalance = 0.035  # value for rebalancing threshold
         comm_rate = 0.0005
         margin_daily_rate = 0.05 / 252  # annual rate / trading days
         ticker_prices = prices_pivot[ticker].reindex(returns.index)
         volatility = volatility.clip(lower=0.0125)  # limit flour for volatility
 
         # 2  Asymmetric Target (based on sma_200)
-        sma200 = ticker_prices.rolling(200).mean().shift(1)
-        volatility_target = np.where(ticker_prices > sma200, 0.02, 0.01)
+        sma = ticker_prices.rolling(sma_window).mean().shift(1)
+        volatility_target = np.where(ticker_prices.shift(1) > sma, 0.02, 0.01)
 
         # 3  Volatility Risk Premium Offset
         raw_position = (volatility_target / (volatility * vol_discount)).clip(0, leverage)
@@ -109,6 +111,8 @@ def strategies_backtest(results, period_filter=None, verbose=False,
             # Only update position if the change is greater than 5%
             if abs(raw_position.iloc[i] - position.iloc[i - 1]) < rebalance:
                 position.iloc[i] = position.iloc[i - 1]
+
+        diagnostic_positions.extend(position.values) # for sensitivity plot
 
         # 5  Drawdown Protection (Circuit Breaker)
         # Calculating equity and drawdown to adjust position risk
@@ -157,7 +161,7 @@ def strategies_backtest(results, period_filter=None, verbose=False,
                     **metrics # from function "calculate_metrics"
                 })
 
-    return pd.DataFrame(all_metrics)
+    return pd.DataFrame(all_metrics), diagnostic_positions
 
 
 # Function to calculate metrics
@@ -180,7 +184,6 @@ def calculate_metrics(returns_series, equity_series, turnover,target,return_fixe
     var = np.percentile(returns_series, percentile * 100)
     cvar = returns_series[returns_series <= var].mean()
 
-
     # Volatility Target Deviation
     if target is not None:
         realized_vol = returns_series.rolling(20).std()
@@ -191,7 +194,6 @@ def calculate_metrics(returns_series, equity_series, turnover,target,return_fixe
         vol_target_dev = np.nanmean(np.abs(realized_vol - target_aligned))
     else:
         vol_target_dev = np.nan
-
 
     # Tail Risk Reduction
     if return_fixed is not None:
@@ -230,6 +232,8 @@ rebalance_values = [0.02, 0.03, 0.035, 0.05]
 vol_discount_values = [0.6, 0.8, 1.0]
 
 sensitivity_results = []
+all_positions = []
+main_positions = []  # for basic leverage plot
 
 for period in periods:
 
@@ -239,14 +243,16 @@ for period in periods:
 
     filtered_results = [r for r in results if r["summary"]["Period"] == period]
 
-    results_df = strategies_backtest(filtered_results)
+    results_df, period_positions = strategies_backtest(filtered_results)
     results_df["Period"] = period
     all_results.append(results_df)
+    all_positions.extend(period_positions) # for plots
+    main_positions.extend(period_positions)
 
     for reb in rebalance_values:
         for vd in vol_discount_values:
 
-            tmp_df = strategies_backtest(
+            tmp_df, _ = strategies_backtest(
                 filtered_results,
                 rebalance=reb,
                 vol_discount=vd
@@ -293,54 +299,17 @@ pivot_regime = regime_df.pivot_table(
 win_rates_regime = {}
 for (period_name, strategy), _ in regime_summary.iterrows():
     if strategy != "Buy & Hold":
-        # Считаем победы конкретной стратегии над B&H внутри одного периода
         current_period_data = pivot_regime.xs(period_name, level='Periods')
         wins = (current_period_data[strategy] > current_period_data["Buy & Hold"]).sum()
         total = len(current_period_data)
         win_rates_regime[(period_name, strategy)] = f"{wins}/{total} ({wins / total:.1%})"
 
-# Мапим результаты в таблицу
 regime_summary["Outperf. (vs B&H)"] = [
     win_rates_regime.get(index, "-") for index in regime_summary.index
 ]
 
-# periods printing sutup
-regime_print = regime_summary.copy()
-cols_2_decimal = ["Turnover", "Max_Drawdown", "Annual_Vol"]
-cols_4_decimal = ["Sharpe", "Total Return","Hit_Ratio", "CVaR", "RMSE_Vol", "TRR"]
-for col in cols_2_decimal:
-    if col in regime_print.columns:
-        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
-for col in cols_4_decimal:
-    if col in regime_print.columns:
-        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
-regime_print = regime_print.fillna("-")
-
-# =========================================================
-# SENSITIVITY PLOT
-# =========================================================
-
-pivot = sensitivity_df.groupby(
-    ["rebalance", "vol_discount", "Strategy"]
-)["Sharpe"].mean().reset_index()
-
-pivot_tvs = pivot[pivot["Strategy"] == "Target Volatility Scaling (TVS)"]
-
-pivot_table = pivot_tvs.pivot(
-    index="rebalance",
-    columns="vol_discount",
-    values="Sharpe"
-)
-
-pivot_table.plot(figsize=(10,6))
-plt.title("Sensitivity of Sharpe to Parameters")
-plt.grid(True)
-plt.show()
-
 # =========================================================
 # FINAL SUMMARY
-# =========================================================
-
 summary = final_df.groupby("Strategy").agg({
     "Total Return": "mean",
     "Sharpe": "mean",
@@ -353,7 +322,18 @@ summary = final_df.groupby("Strategy").agg({
     "TRR": "mean"
 }).sort_values("Sharpe", ascending=False)
 
-#===============================================================================
+# Periods printing setup
+regime_print = regime_summary.copy()
+cols_2_decimal = ["Turnover", "Max_Drawdown", "Annual_Vol"]
+cols_4_decimal = ["Sharpe", "Total Return","Hit_Ratio", "CVaR", "RMSE_Vol", "TRR"]
+for col in cols_2_decimal:
+    if col in regime_print.columns:
+        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+for col in cols_4_decimal:
+    if col in regime_print.columns:
+        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
+regime_print = regime_print.fillna("-")
+
 # FINAL table printing setup
 summary_print = summary.copy()
 for col in cols_2_decimal:
@@ -364,7 +344,7 @@ for col in cols_4_decimal:
         summary_print[col] = summary_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
 summary_print = summary_print.fillna("-")
 
-
+# printing "3 PERIODS ANALYSIS"  and  "FINAL SUMMARY"
 def print_styled_table(df, title):
     print("\n" + "=" * 170)
     print(title.center(170))
@@ -372,16 +352,28 @@ def print_styled_table(df, title):
     output = df.to_string(justify='center', col_space=10)
     print(output)
     print("-" * 170)
-# 3 PERIODS ANALYSIS
 print_styled_table(regime_print, "3 PERIODS ANALYSIS")
-# FINAL SUMMARY
 print_styled_table(summary_print, "AVERAGE PERFORMANCE ACROSS SELECTED PERIODS")
 
+
 ### ==============================================================================================================
-### PLOTS
+### PLOTS FOR PERIODS
+### ==============================================================================================================
+
+
+# ===================================================================================================
+# CORE ANALYSIS (4 PLOTS)
+# Sharpe, Max Drawdown, Return, Equity Curve
 sharpe_dyn = final_df.groupby(["Period", "Strategy"])["Sharpe"].mean().unstack()
 dd_dyn = final_df.groupby(["Period", "Strategy"])["Max_Drawdown"].mean().unstack()
 ret_dyn = final_df.groupby(["Period", "Strategy"])["Total Return"].mean().unstack()
+
+# Equity Curve Calculation (Average Growth of $1)
+equity_data = {}
+for name in ["Buy & Hold", "Target Volatility Scaling (TVS)", "TVS with transaction and margin costs"]:
+    avg_ret_per_period = final_df[final_df["Strategy"] == name].groupby("Period")["Total Return"].mean()
+    equity_data[name] = (1 + avg_ret_per_period).cumprod()
+equity_dyn = pd.DataFrame(equity_data)
 
 # insert year for axes
 year_labels = [(pd.to_datetime(p) + pd.DateOffset(years=2)).strftime('%Y') for p in sharpe_dyn.index]
@@ -401,18 +393,137 @@ axes[0, 1].set_title("Max Drawdown per Period", fontsize=14)
 ret_dyn.reset_index(drop=True).plot(ax=axes[1, 0], marker='d', markersize=5, linewidth=2)
 axes[1, 0].set_title("Total Return per Period", fontsize=14)
 
-# Customization for first 3 plots
-for ax in [axes[0, 0], axes[0, 1], axes[1, 0]]:
-    ax.set_xticks(range(0, len(year_labels), 2))
-    ax.set_xticklabels([year_labels[i] for i in range(0, len(year_labels), 2)])
+# 4. Equity Curve
+equity_dyn.reset_index(drop=True).plot(ax=axes[1, 1], linewidth=3)
+axes[1, 1].set_title("Cumulative Growth of $1 (Average)", fontsize=14)
+
+# Customization for all 4 plots
+for ax in axes.flat:
+    ax.set_xticks(range(0, len(year_labels)))
+    ax.set_xticklabels(year_labels, rotation=45)
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
     ax.set_xlabel("Year")
 
-# 4. Boxplot
-final_df.boxplot(column='Sharpe', by='Strategy', ax=axes[1, 1], patch_artist=True)
-axes[1, 1].set_title("Sharpe Distribution", fontsize=14)
-plt.suptitle("")
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.show()
+# ===================================================================================================
+
+
+
+#===================================================================================================
+# Volatility Targeting Accuracy
+# Aggregated portfolio volatility vs target
+all_vols = []
+for r in results:
+    s_ret = r["series"]["returns"] / 100
+    r_vol = s_ret.rolling(20).std() * np.sqrt(252)
+    all_vols.append(r_vol)
+
+mean_realized_vol = pd.concat(all_vols, axis=1).mean(axis=1).iloc[:500]
+
+plt.figure(figsize=(12, 6))
+plt.plot(mean_realized_vol.values, label='Average Realized Volatility (Portfolio)', color='orange', linewidth=2)
+plt.axhline(y=0.02, color='black', linestyle='--', label='Target Volatility (2%)')
+plt.fill_between(range(len(mean_realized_vol)), mean_realized_vol.values, 0.02, color='gray', alpha=0.1)
+plt.title("Volatility Targeting Accuracy (Portfolio Level)", fontsize=14)
+plt.legend()
+plt.grid(alpha=0.2)
+plt.show()
+#===================================================================================================
+
+
+
+#===================================================================================================
+# Leverage Distribution (Main Strategy Only)
+plt.figure(figsize=(10, 6))
+plt.hist(main_positions, bins=50, color='teal', alpha=0.7, edgecolor='white')
+plt.axvline(x=1.0, color='red', linestyle='--', label='No Leverage (100% Weight)')
+plt.title("Leverage Usage Distribution (Default Parameters)", fontsize=14)
+plt.xlabel("Position Size (0.0 to 2.0)")
+plt.ylabel("Frequency (Days)")
+plt.legend()
+plt.grid(alpha=0.2)
+plt.show()
+#===================================================================================================
+
+
+
+
+### ==============================================================================================================
+### SENSITIVITY PLOTS
+### ==============================================================================================================
+
+
+# ==============================================================================================================
+# ROBUSTNESS: SENSITIVITY ANALYSIS (4 HEATMAPS)
+# Sharpe, CVaR, Return, Std Sharpe
+tvs_sens = sensitivity_df[sensitivity_df["Strategy"] == "Target Volatility Scaling (TVS)"]
+
+fig, axes = plt.subplots(2, 2, figsize=(20, 14))
+fig.suptitle("SENSITIVITY ANALYSIS: RISK & PERFORMANCE HEATMAPS", fontsize=22, fontweight='bold')
+
+metrics = [
+    ("Sharpe", "Mean Sharpe Ratio (Efficiency)", "YlGnBu"),
+    ("CVaR", "Mean CVaR (Tail Risk)", "Reds_r"),
+    ("Total Return", "Mean Total Return (Performance)", "Greens"),
+    ("Sharpe", "Std Dev of Sharpe (Stability)", "Purples")
+]
+
+for i, (metric, title, cmap) in enumerate(metrics):
+    ax = axes[i // 2, i % 2]
+    if "Std Dev" in title:
+        pivot_data = tvs_sens.groupby(["rebalance", "vol_discount"])[metric].std().unstack()
+    else:
+        pivot_data = tvs_sens.groupby(["rebalance", "vol_discount"])[metric].mean().unstack()
+
+    fmt = ".2%" if metric == "Total Return" else ".3f"
+
+    sns.heatmap(pivot_data, annot=True, fmt=fmt, cmap=cmap, ax=ax, cbar_kws={'label': metric})
+
+    ax.set_title(title, fontsize=16)
+    ax.set_ylabel("Rebalance Threshold")
+    ax.set_xlabel("Volatility Discount")
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
+# ==============================================================================================================
+
+
+
+#===================================================================================================
+# SMA Window Sensitivity
+sma_values = [50, 100, 150, 200, 250]
+sma_results = []
+
+for sma in sma_values:
+    res_df, _ = strategies_backtest(filtered_results, sma_window=sma)
+    res_df["sma_window"] = sma
+    sma_results.append(res_df)
+
+sma_df = pd.concat(sma_results)
+sma_plot = sma_df.groupby("sma_window")["Sharpe"].mean()
+
+plt.figure(figsize=(10, 5))
+sma_plot.plot(kind='bar', color='skyblue', edgecolor='black')
+plt.title("Sensitivity to SMA Window (Trend Detection)", fontsize=14)
+plt.ylabel("Average Sharpe Ratio")
+plt.xlabel("SMA Lookback Period")
+plt.grid(axis='y', alpha=0.3)
+plt.show()
+#===================================================================================================
+
+
+
+#===================================================================================================
+# Leverage Sensitivity
+plt.figure(figsize=(10, 6))
+plt.hist(all_positions, bins=30, color='teal', alpha=0.7, edgecolor='white')
+plt.axvline(x=1.0, color='red', linestyle='--', label='No Leverage Threshold')
+plt.title("Leverage Usage Distribution", fontsize=14)
+plt.xlabel("Position Size (Leverage)")
+plt.ylabel("Frequency (Days)")
+plt.legend()
+plt.grid(alpha=0.2)
+plt.show()
+#===================================================================================================

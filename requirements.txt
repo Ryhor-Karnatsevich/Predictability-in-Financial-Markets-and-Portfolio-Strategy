@@ -6,4 +6,4 @@ arch
 scikit-learn
 joblib
 polars
-
+seaborn
