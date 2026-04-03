@@ -7,10 +7,6 @@ import polars as pl
 # Window settings
 pd.set_option('display.max_columns', None)
 pd.set_option('display.width', 1000)
-pd.options.display.float_format = '{:.4f}'.format
-def format_float(x):
-    return f'{x:.4f}' if pd.notna(x) else '-'
-pd.options.display.float_format = format_float
 
 # Import model
 with open("../../Data/Results/garch_results.pkl", "rb") as f:
@@ -213,13 +209,13 @@ def calculate_metrics(returns_series, equity_series, turnover,target,return_fixe
     return {
         "Total Return": total_return,
         "Sharpe": sharpe,
-        "Max Drawdown": max_dd,
-        "Annual Vol": annual_vol,
-        "Hit Ratio": hit_ratio,
+        "Max_Drawdown": max_dd,
+        "Annual_Vol": annual_vol,
+        "Hit_Ratio": hit_ratio,
         "Turnover": turnover,
         "CVaR": cvar,
-        "Vol Target Deviation": vol_target_dev,
-        "Tail Risk Reduction": tail_risk_reduction
+        "RMSE_Vol": vol_target_dev,
+        "TRR": tail_risk_reduction
     }
 
 
@@ -270,7 +266,7 @@ sensitivity_df = pd.concat(sensitivity_results)
 # =========================================================
 
 regime_df = final_df[final_df["Period"].isin(target_periods)].copy()
-regime_df["Regime"] = regime_df["Period"].map({
+regime_df["Periods"] = regime_df["Period"].map({
     target_periods[0]: "2007-2009",
     target_periods[1]: "2015-2017",
     target_periods[2]: "2018-2020"
@@ -279,24 +275,46 @@ regime_df["Regime"] = regime_df["Period"].map({
 regime_summary = regime_df.groupby(["Periods", "Strategy"]).agg({
     "Total Return": "mean",
     "Sharpe": "mean",
-    "Max Drawdown": "mean",
-    "Annual Vol": "mean",
-    "Hit Ratio": "mean",
+    "Max_Drawdown": "mean",
+    "Annual_Vol": "mean",
+    "Hit_Ratio": "mean",
     "Turnover": "mean",
     "CVaR": "mean",
-    "Vol Target Deviation": "mean",
-    "Tail Risk Reduction": "mean"
+    "RMSE_Vol": "mean",
+    "TRR": "mean"
+}).sort_values(by=["Periods", "Sharpe"],ascending=[True, False])
 
-})
-regime_summary = regime_summary.sort_values(
-    by=["Regime", "Sharpe"],
-    ascending=[True, False]
+# Adding Outperformance column
+pivot_regime = regime_df.pivot_table(
+    index=['Periods', 'Ticker'],
+    columns='Strategy',
+    values='Sharpe'
 )
+win_rates_regime = {}
+for (period_name, strategy), _ in regime_summary.iterrows():
+    if strategy != "Buy & Hold":
+        # Считаем победы конкретной стратегии над B&H внутри одного периода
+        current_period_data = pivot_regime.xs(period_name, level='Periods')
+        wins = (current_period_data[strategy] > current_period_data["Buy & Hold"]).sum()
+        total = len(current_period_data)
+        win_rates_regime[(period_name, strategy)] = f"{wins}/{total} ({wins / total:.1%})"
 
-print("\n" + "="*103)
-print("3 PERIODS ANALYSIS".center(103))
-print("="*103)
-print(regime_summary)
+# Мапим результаты в таблицу
+regime_summary["Outperf. (vs B&H)"] = [
+    win_rates_regime.get(index, "-") for index in regime_summary.index
+]
+
+# periods printing sutup
+regime_print = regime_summary.copy()
+cols_2_decimal = ["Turnover", "Max_Drawdown", "Annual_Vol"]
+cols_4_decimal = ["Sharpe", "Total Return","Hit_Ratio", "CVaR", "RMSE_Vol", "TRR"]
+for col in cols_2_decimal:
+    if col in regime_print.columns:
+        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+for col in cols_4_decimal:
+    if col in regime_print.columns:
+        regime_print[col] = regime_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
+regime_print = regime_print.fillna("-")
 
 # =========================================================
 # SENSITIVITY PLOT
@@ -326,44 +344,43 @@ plt.show()
 summary = final_df.groupby("Strategy").agg({
     "Total Return": "mean",
     "Sharpe": "mean",
-    "Max Drawdown": "mean",
-    "Annual Vol": "mean",
-    "Hit Ratio": "mean",
+    "Max_Drawdown": "mean",
+    "Annual_Vol": "mean",
+    "Hit_Ratio": "mean",
     "Turnover": "mean",
     "CVaR": "mean",
-    "Vol Target Deviation": "mean",
-    "Tail Risk Reduction": "mean"
+    "RMSE_Vol": "mean",
+    "TRR": "mean"
 }).sort_values("Sharpe", ascending=False)
 
-# Adding Outperformance column
-win_rates = {}
-
-pivot = final_df.pivot_table(
-    index='Ticker',
-    columns='Strategy',
-    values='Sharpe'
-)
-
-for strategy in summary.index:
-    if strategy != "Buy & Hold":
-        wins = (pivot[strategy] > pivot["Buy & Hold"]).sum()
-        total = len(pivot)
-        win_rates[strategy] = f"{wins}/{total} ({wins / total:.1%})"
-
-summary["Outperformance (vs B&H)"] = summary.index.map(
-    lambda x: win_rates.get(x, "-")
-)
 #===============================================================================
-print("\n" + "=" * 103)
-print("AVERAGE PERFORMANCE ACROSS SELECTED PERIODS".center(103))
-print("=" * 103)
-print(summary)
+# FINAL table printing setup
+summary_print = summary.copy()
+for col in cols_2_decimal:
+    if col in summary_print.columns:
+        summary_print[col] = summary_print[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
+for col in cols_4_decimal:
+    if col in summary_print.columns:
+        summary_print[col] = summary_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
+summary_print = summary_print.fillna("-")
 
+
+def print_styled_table(df, title):
+    print("\n" + "=" * 170)
+    print(title.center(170))
+    print("=" * 170)
+    output = df.to_string(justify='center', col_space=10)
+    print(output)
+    print("-" * 170)
+# 3 PERIODS ANALYSIS
+print_styled_table(regime_print, "3 PERIODS ANALYSIS")
+# FINAL SUMMARY
+print_styled_table(summary_print, "AVERAGE PERFORMANCE ACROSS SELECTED PERIODS")
 
 ### ==============================================================================================================
 ### PLOTS
 sharpe_dyn = final_df.groupby(["Period", "Strategy"])["Sharpe"].mean().unstack()
-dd_dyn = final_df.groupby(["Period", "Strategy"])["Max Drawdown"].mean().unstack()
+dd_dyn = final_df.groupby(["Period", "Strategy"])["Max_Drawdown"].mean().unstack()
 ret_dyn = final_df.groupby(["Period", "Strategy"])["Total Return"].mean().unstack()
 
 # insert year for axes
