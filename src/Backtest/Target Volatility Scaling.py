@@ -39,6 +39,7 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
 
     all_metrics = []
     diagnostic_positions = [] # for sensitivity plot
+    diagnostic_equities = [] #  equity curves
 
     for r in results:
         ticker = r["summary"]["Ticker"]
@@ -140,6 +141,14 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
             equity = (1 + strategy_return).cumprod()  # creates equity curve (line of returns of all previous time)
             metrics = calculate_metrics(strategy_return, equity, turnover, target, return_fixed)  # Use function that below
 
+            diagnostic_equities.append({
+                "Ticker": ticker,
+                "Period": period,
+                "Strategy": name,
+                "Equity": equity,
+                "Dates": equity.index
+            })
+
             if metrics:
                 # Adding data to list for final table
                 all_metrics.append({
@@ -149,7 +158,7 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
                     **metrics # from function "calculate_metrics"
                 })
 
-    return pd.DataFrame(all_metrics), diagnostic_positions
+    return pd.DataFrame(all_metrics), diagnostic_positions, diagnostic_equities
 
 
 # Function to calculate metrics
@@ -216,6 +225,7 @@ def calculate_metrics(returns_series, equity_series, turnover,target,return_fixe
 # EXECUTION Setup
 all_results = [] # Storage for ENGINE calculations for every period without sensitivity
 all_positions = [] # Storage for position curves for each ticker and each period (leverage plot)
+all_equities = [] # for equity curve
 
 # sensitivity setup
 rebalance_values = [0.02, 0.03, 0.04, 0.05]
@@ -229,15 +239,16 @@ for period in periods:
 
     filtered_results = [r for r in results if r["summary"]["Period"] == period]
 
-    results_df, period_positions = strategies_backtest(filtered_results)
+    results_df, period_positions,equities = strategies_backtest(filtered_results)
     all_results.append(results_df)
     all_positions.extend(period_positions) # for leverage plot
+    all_equities.extend(equities)    # for equity curve
 
     # Sensitivity loop
     for reb in rebalance_values:
         for vd in vol_discount_values:
 
-            tmp_df, _ = strategies_backtest(
+            tmp_df, _ , _ = strategies_backtest(
                 filtered_results,
                 rebalance=reb,
                 vol_discount=vd
@@ -357,12 +368,6 @@ sharpe_dyn = final_df.groupby(["Period", "Strategy"])["Sharpe"].mean().unstack()
 dd_dyn = final_df.groupby(["Period", "Strategy"])["Max_Drawdown"].mean().unstack()
 ret_dyn = final_df.groupby(["Period", "Strategy"])["Total Return"].mean().unstack()
 
-# Equity Curve Calculation (Average Growth of $1)
-equity_data = {}
-for name in ["Buy & Hold", "Target Volatility Scaling (TVS)", "TVS with transaction and margin costs"]:
-    avg_ret_per_period = final_df[final_df["Strategy"] == name].groupby("Period")["Total Return"].mean()
-    equity_data[name] = (1 + avg_ret_per_period).cumprod()
-equity_dyn = pd.DataFrame(equity_data)
 
 # insert year for axes
 year_labels = [(pd.to_datetime(p) + pd.DateOffset(years=2)).strftime('%Y') for p in sharpe_dyn.index]
@@ -383,16 +388,46 @@ ret_dyn.reset_index(drop=True).plot(ax=axes[1, 0], marker='d', markersize=5, lin
 axes[1, 0].set_title("Total Return per Period", fontsize=14)
 
 # 4. Equity Curve
-equity_dyn.reset_index(drop=True).plot(ax=axes[1, 1], linewidth=3)
-axes[1, 1].set_title("Cumulative Growth of $1 (Average)", fontsize=14)
+import matplotlib.dates as mdates
+equity_df = pd.DataFrame([
+    {
+        "Date": date,
+        "Strategy": e["Strategy"],
+        "Equity": e["Equity"].iloc[i]
+    }
+    for e in all_equities
+    for i, date in enumerate(e["Dates"])
+])
+equity_avg = equity_df.groupby(["Date", "Strategy"])["Equity"].mean().unstack()
+equity_avg = equity_avg / equity_avg.iloc[0]
+equity_smooth = equity_avg.resample("ME").last()
+equity_smooth = equity_smooth.rolling(3).mean()
+equity_smooth.plot(ax=axes[1, 1], linewidth=2)
+
+axes[1, 1].set_title("Average Equity Curve ($1 Starting Capital)", fontsize=14)
+axes[1, 1].set_ylabel("Portfolio Value ($)")
+axes[1, 1].grid(True, alpha=0.3)
+axes[1, 1].legend(fontsize=8)
+# --- FIX X AXIS (чёткие года как в других графиках) ---
+years = pd.date_range(
+    start=equity_smooth.index.min(),
+    end=equity_smooth.index.max(),
+    freq="YS"   # Year Start
+)
+
+axes[1, 1].set_xticks(years)
+axes[1, 1].set_xticklabels([d.year for d in years], rotation=0)
+axes[1, 1].set_xlabel("Year")
+
 
 # Customization for all 4 plots
-for ax in axes.flat:
+for i in range(3):
+    ax = axes.flat[i]
     ax.set_xticks(range(0, len(year_labels)))
     ax.set_xticklabels(year_labels, rotation=45)
+    ax.set_xlabel("Year")
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
-    ax.set_xlabel("Year")
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
