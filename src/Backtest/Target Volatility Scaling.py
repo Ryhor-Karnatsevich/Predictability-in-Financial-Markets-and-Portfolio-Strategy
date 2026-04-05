@@ -131,7 +131,7 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
 
         # Dictionary with return and weight for final table
         strategies = {
-            "Buy & Hold": (return_fixed, weight_fixed,None,None, None),
+            "Buy & Hold": (return_fixed, weight_fixed,0,None, None),
             "TVS with transaction and margin costs": (return_net_basic, position_basic,turnover_basic,target_0,return_fixed),
             "Target Volatility Scaling (TVS)": (return_net, position,turnover,volatility_target,return_fixed)
         }
@@ -183,7 +183,7 @@ def calculate_metrics(returns_series, equity_series, turnover,target,return_fixe
 
     # Volatility Target Deviation
     if target is not None:
-        realized_vol = returns_series.rolling(20).std()
+        realized_vol = returns_series.rolling(20).std().rolling(20).mean() # use also mean to smoothen it(Double smoothing)
         if isinstance(target, pd.Series):
             target_aligned = target.reindex(returns_series.index)
         else:
@@ -399,7 +399,7 @@ avg_daily_ret = returns_all.groupby(["Date", "Strategy"])["Ret"].mean().unstack(
 equity_final = (1 + avg_daily_ret.fillna(0)).cumprod()
 equity_smooth = equity_final.resample("ME").last().rolling(window=3).mean().bfill()
 equity_smooth.plot(ax=axes[1, 1], linewidth=2)
-axes[1, 1].set_title("Compound Portfolio Growth ", fontsize=14)
+axes[1, 1].set_title("Average Equity Curve", fontsize=14)
 axes[1, 1].set_ylabel("Portfolio Value")
 axes[1, 1].grid(True, alpha=0.3)
 axes[1, 1].legend(fontsize=8)
@@ -443,42 +443,15 @@ plt.show()
 
 # ====================================================================================================================
 # MECHANICS ANALYSIS
-# leverage distribution & volatility targeting accuracy
-
-# Volatility Targeting Accuracy
-# Aggregated portfolio volatility vs target
-all_vols = []
-for r in results:
-    s_ret = r["series"]["returns"] / 100
-    r_vol = s_ret.rolling(20).std() * np.sqrt(252)
-    all_vols.append(r_vol)
-
-mean_realized_vol = pd.concat(all_vols, axis=1).mean(axis=1).iloc[:500]
-
-
-fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
-fig.suptitle("MECHANICS ANALYSIS", fontsize=18, fontweight='bold')
-
-# Volatility Targeting Accuracy
-ax1.plot(mean_realized_vol.values, label='Average Realized Volatility (Portfolio)', color='orange', linewidth=2)
-ax1.axhline(y=0.02, color='black', linestyle='--', label='Target Volatility (2%)')
-ax1.fill_between(range(len(mean_realized_vol)), mean_realized_vol.values, 0.02, color='gray', alpha=0.1)
-ax1.set_title("Volatility Targeting Accuracy (Portfolio Level)", fontsize=14)
-ax1.set_ylabel("Annualized Volatility")
-ax1.set_xlabel("Days")
-ax1.legend()
-ax1.grid(alpha=0.2)
-
 # Leverage Distribution (Main Strategy Only)
-ax2.hist(all_positions, bins=50, color='teal', alpha=0.7, edgecolor='white')
-ax2.axvline(x=1.0, color='red', linestyle='--', label='No Leverage (100% Weight)')
-ax2.set_title("Leverage Usage Distribution (Default Parameters)", fontsize=14)
-ax2.set_xlabel("Position Size (0.0 to 2.0)")
-ax2.set_ylabel("Frequency (Days)")
-ax2.legend()
-ax2.grid(alpha=0.2)
-
-plt.tight_layout(rect=[0, 0.03, 1, 0.95])
+plt.figure(figsize=(10, 6))
+plt.hist(all_positions, bins=50, color='teal', alpha=0.7, edgecolor='white')
+plt.axvline(x=1.0, color='red', linestyle='--', label='No Leverage (100% Weight)')
+plt.title("Leverage Usage Distribution (Default Parameters)", fontsize=14)
+plt.xlabel("Position Size (0.0 to 2.0)")
+plt.ylabel("Frequency (Days)")
+plt.legend()
+plt.grid(alpha=0.2)
 plt.show()
 # ====================================================================================================================
 
