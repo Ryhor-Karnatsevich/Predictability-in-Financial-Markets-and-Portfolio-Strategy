@@ -145,8 +145,8 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
                 "Ticker": ticker,
                 "Period": period,
                 "Strategy": name,
-                "Equity": equity,
-                "Dates": equity.index
+                "Returns": strategy_return,
+                "Dates": strategy_return.index
             })
 
             if metrics:
@@ -354,26 +354,23 @@ print_styled_table(summary_print, "AVERAGE PERFORMANCE ACROSS SELECTED PERIODS")
 
 
 
-
-
 ### ==================================================================================================================
-### PLOTS FOR PERIODS
+### VISUALISATION
 ### ==================================================================================================================
 
 
 # ====================================================================================================================
-# CORE ANALYSIS (4 PLOTS)
+# ROBUSTNESS ANALYSIS (4 PLOTS)
 # Sharpe, Max Drawdown, Return, Equity Curve
 sharpe_dyn = final_df.groupby(["Period", "Strategy"])["Sharpe"].mean().unstack()
 dd_dyn = final_df.groupby(["Period", "Strategy"])["Max_Drawdown"].mean().unstack()
 ret_dyn = final_df.groupby(["Period", "Strategy"])["Total Return"].mean().unstack()
 
-
 # insert year for axes
 year_labels = [(pd.to_datetime(p) + pd.DateOffset(years=2)).strftime('%Y') for p in sharpe_dyn.index]
 
 fig, axes = plt.subplots(2, 2, figsize=(18, 12))
-fig.suptitle("GLOBAL STRATEGY ROBUSTNESS ANALYSIS (2007-2018)", fontsize=20, fontweight='bold')
+fig.suptitle("GLOBAL STRATEGY ROBUSTNESS ANALYSIS (2007-2020)", fontsize=20, fontweight='bold')
 
 # 1. Sharpe Ratio
 sharpe_dyn.reset_index(drop=True).plot(ax=axes[0, 0], marker='o', markersize=5, linewidth=2)
@@ -388,43 +385,53 @@ ret_dyn.reset_index(drop=True).plot(ax=axes[1, 0], marker='d', markersize=5, lin
 axes[1, 0].set_title("Total Return per Period", fontsize=14)
 
 # 4. Equity Curve
-import matplotlib.dates as mdates
-equity_df = pd.DataFrame([
-    {
-        "Date": date,
+returns_list = []
+for e in all_equities:
+    temp_series = pd.DataFrame({
+        "Date": e["Dates"],
         "Strategy": e["Strategy"],
-        "Equity": e["Equity"].iloc[i]
-    }
-    for e in all_equities
-    for i, date in enumerate(e["Dates"])
-])
-equity_avg = equity_df.groupby(["Date", "Strategy"])["Equity"].mean().unstack()
-equity_avg = equity_avg / equity_avg.iloc[0]
-equity_smooth = equity_avg.resample("ME").last()
-equity_smooth = equity_smooth.rolling(3).mean()
-equity_smooth.plot(ax=axes[1, 1], linewidth=2)
+        "Ret": e["Returns"].values
+    })
+    returns_list.append(temp_series)
 
-axes[1, 1].set_title("Average Equity Curve ($1 Starting Capital)", fontsize=14)
-axes[1, 1].set_ylabel("Portfolio Value ($)")
+returns_all = pd.concat(returns_list).reset_index(drop=True)
+avg_daily_ret = returns_all.groupby(["Date", "Strategy"])["Ret"].mean().unstack()
+equity_final = (1 + avg_daily_ret.fillna(0)).cumprod()
+equity_smooth = equity_final.resample("ME").last().rolling(window=3).mean().bfill()
+equity_smooth.plot(ax=axes[1, 1], linewidth=2)
+axes[1, 1].set_title("Compound Portfolio Growth ", fontsize=14)
+axes[1, 1].set_ylabel("Portfolio Value")
 axes[1, 1].grid(True, alpha=0.3)
 axes[1, 1].legend(fontsize=8)
-# --- FIX X AXIS (чёткие года как в других графиках) ---
 years = pd.date_range(
     start=equity_smooth.index.min(),
     end=equity_smooth.index.max(),
-    freq="YS"   # Year Start
+    freq="YS"
 )
-
 axes[1, 1].set_xticks(years)
 axes[1, 1].set_xticklabels([d.year for d in years], rotation=0)
 axes[1, 1].set_xlabel("Year")
+from matplotlib.ticker import ScalarFormatter
+axes[1, 1].set_yscale('log')
+for axis in [axes[1, 1].yaxis]:
+    axis.set_major_formatter(ScalarFormatter())
+axes[1, 1].set_yticks([1, 1.2, 1.44, 1.73, 2.07, 2.49, 3, 3.6, 4.32, 5.18, 6.22, 7])
 
 
-# Customization for all 4 plots
+# Customization for 3 plots
 for i in range(3):
     ax = axes.flat[i]
-    ax.set_xticks(range(0, len(year_labels)))
-    ax.set_xticklabels(year_labels, rotation=45)
+    clean_labels = []
+    prev = None
+    for y in year_labels:
+        if y != prev:
+            clean_labels.append(y)
+            prev = y
+        else:
+            clean_labels.append("")
+
+    ax.set_xticks(range(len(clean_labels)))
+    ax.set_xticklabels(clean_labels, rotation=0)
     ax.set_xlabel("Year")
     ax.grid(True, alpha=0.3)
     ax.legend(fontsize=8)
@@ -434,8 +441,10 @@ plt.show()
 # ====================================================================================================================
 
 
-
 # ====================================================================================================================
+# MECHANICS ANALYSIS
+# leverage distribution & volatility targeting accuracy
+
 # Volatility Targeting Accuracy
 # Aggregated portfolio volatility vs target
 all_vols = []
@@ -446,124 +455,36 @@ for r in results:
 
 mean_realized_vol = pd.concat(all_vols, axis=1).mean(axis=1).iloc[:500]
 
-plt.figure(figsize=(12, 6))
-plt.plot(mean_realized_vol.values, label='Average Realized Volatility (Portfolio)', color='orange', linewidth=2)
-plt.axhline(y=0.02, color='black', linestyle='--', label='Target Volatility (2%)')
-plt.fill_between(range(len(mean_realized_vol)), mean_realized_vol.values, 0.02, color='gray', alpha=0.1)
-plt.title("Volatility Targeting Accuracy (Portfolio Level)", fontsize=14)
-plt.legend()
-plt.grid(alpha=0.2)
-plt.show()
-# ====================================================================================================================
 
+fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 7))
+fig.suptitle("MECHANICS ANALYSIS", fontsize=18, fontweight='bold')
 
+# Volatility Targeting Accuracy
+ax1.plot(mean_realized_vol.values, label='Average Realized Volatility (Portfolio)', color='orange', linewidth=2)
+ax1.axhline(y=0.02, color='black', linestyle='--', label='Target Volatility (2%)')
+ax1.fill_between(range(len(mean_realized_vol)), mean_realized_vol.values, 0.02, color='gray', alpha=0.1)
+ax1.set_title("Volatility Targeting Accuracy (Portfolio Level)", fontsize=14)
+ax1.set_ylabel("Annualized Volatility")
+ax1.set_xlabel("Days")
+ax1.legend()
+ax1.grid(alpha=0.2)
 
-# ====================================================================================================================
 # Leverage Distribution (Main Strategy Only)
-plt.figure(figsize=(10, 6))
-plt.hist(all_positions, bins=50, color='teal', alpha=0.7, edgecolor='white')
-plt.axvline(x=1.0, color='red', linestyle='--', label='No Leverage (100% Weight)')
-plt.title("Leverage Usage Distribution (Default Parameters)", fontsize=14)
-plt.xlabel("Position Size (0.0 to 2.0)")
-plt.ylabel("Frequency (Days)")
-plt.legend()
-plt.grid(alpha=0.2)
+ax2.hist(all_positions, bins=50, color='teal', alpha=0.7, edgecolor='white')
+ax2.axvline(x=1.0, color='red', linestyle='--', label='No Leverage (100% Weight)')
+ax2.set_title("Leverage Usage Distribution (Default Parameters)", fontsize=14)
+ax2.set_xlabel("Position Size (0.0 to 2.0)")
+ax2.set_ylabel("Frequency (Days)")
+ax2.legend()
+ax2.grid(alpha=0.2)
+
+plt.tight_layout(rect=[0, 0.03, 1, 0.95])
 plt.show()
 # ====================================================================================================================
 
 
-
 # ====================================================================================================================
-# EQUITY CURVES PLOT
-plt.figure(figsize=(12, 7))
-
-for strategy_name in final_df["Strategy"].unique():
-    # Calculate average cumulative return across all tickers/periods
-    strat_data = final_df[final_df["Strategy"] == strategy_name]
-    # Group by index/time if possible, or just plot the mean total return growth
-    avg_growth = (1 + strat_data.groupby("Period")["Total Return"].mean()).cumprod()
-    plt.plot(avg_growth.values, label=strategy_name, linewidth=2)
-
-plt.title("Cumulative Growth of $1 (Average across Portfolio)", fontsize=15, fontweight='bold')
-plt.xlabel("Test Periods")
-plt.ylabel("Portfolio Value")
-plt.legend()
-plt.grid(alpha=0.3)
-plt.show()
-# ====================================================================================================================
-
-
-
-# ====================================================================================================================
-# SMOOTHED POSITION (DIAGNOSTIC)
-plt.figure(figsize=(10, 5))
-# Converting the list of all positions to a Series to see the leverage trend
-pd.Series(all_positions).rolling(200).mean().plot(color='teal', lw=2)
-plt.axhline(y=1.0, color='red', linestyle='--', label='Full Capital Usage (1x)')
-plt.title("Portfolio Leverage Trend (Smoothed)", fontsize=14)
-plt.ylabel("Position Size")
-plt.legend()
-plt.show()
-# ====================================================================================================================
-
-
-
-# ====================================================================================================================
-# VOLATILITY TARGETING ACCURACY PLOT
-plt.figure(figsize=(12, 6))
-
-# Extract realized volatility for a sample ticker or aggregate portfolio
-sample_ticker = ticker_list[0]
-sample_results = [r for r in results if r["summary"]["Ticker"] == sample_ticker][0]
-s_ret = sample_results["series"]["returns"] / 100
-realized_vol = s_ret.rolling(20).std() * np.sqrt(252)
-
-# Use a static or adaptive target for comparison
-plt.plot(realized_vol.index, realized_vol.values, label='Realized Vol (20d Rolling)', color='orange', alpha=0.8)
-plt.axhline(y=0.02, color='black', linestyle='--', label='Static Target (2%)')
-
-plt.title(f"Volatility Targeting Accuracy: {sample_ticker}", fontsize=14)
-plt.ylabel("Annualized Volatility")
-plt.legend()
-plt.grid(alpha=0.3)
-plt.show()
-# ====================================================================================================================
-
-
-
-# ====================================================================================================================
-# FINAL DIAGNOSTIC: PORTFOLIO LEVERAGE DYNAMICS
-plt.figure(figsize=(14, 6))
-
-# Smoothing the positions to see the trend across all tickers and periods
-smoothed_pos = pd.Series(all_positions).rolling(window=500).mean()
-
-plt.plot(smoothed_pos, color='#2E8B57', linewidth=2, label='Avg Portfolio Leverage (500-day MA)')
-plt.axhline(y=1.0, color='red', linestyle='--', alpha=0.6, label='Neutral (1.0x)')
-plt.axhline(y=1.5, color='orange', linestyle=':', alpha=0.6, label='High Leverage (1.5x)')
-
-plt.fill_between(range(len(smoothed_pos)), 0, smoothed_pos, color='green', alpha=0.05)
-
-plt.title("System-Wide Leverage Dynamics (Diagnostic)", fontsize=16, fontweight='bold')
-plt.xlabel("Cumulative Trading Days (All Periods/Tickers)")
-plt.ylabel("Average Position Size")
-plt.ylim(0, 2.1)
-plt.legend(loc='upper right')
-plt.grid(axis='y', alpha=0.2)
-
-plt.tight_layout()
-plt.show()
-# ====================================================================================================================
-
-
-
-### ==================================================================================================================
-### SENSITIVITY PLOTS
-### ==================================================================================================================
-
-
-# ====================================================================================================================
-# ROBUSTNESS: SENSITIVITY ANALYSIS (4 HEATMAPS)
+# SENSITIVITY ANALYSIS (4 HEATMAPS)
 # Sharpe, CVaR, Return, Std Sharpe
 tvs_sens = sensitivity_df[sensitivity_df["Strategy"] == "Target Volatility Scaling (TVS)"]
 
@@ -593,20 +514,5 @@ for i, (metric, title, cmap) in enumerate(metrics):
     ax.set_xlabel("Volatility Discount")
 
 plt.tight_layout(rect=[0, 0.03, 1, 0.95])
-plt.show()
-# ====================================================================================================================
-
-
-
-# ====================================================================================================================
-# Leverage Sensitivity
-plt.figure(figsize=(10, 6))
-plt.hist(all_positions, bins=30, color='teal', alpha=0.7, edgecolor='white')
-plt.axvline(x=1.0, color='red', linestyle='--', label='No Leverage Threshold')
-plt.title("Leverage Usage Distribution", fontsize=14)
-plt.xlabel("Position Size (Leverage)")
-plt.ylabel("Frequency (Days)")
-plt.legend()
-plt.grid(alpha=0.2)
 plt.show()
 # ====================================================================================================================
