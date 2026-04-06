@@ -42,26 +42,54 @@ companies_df = companies_df[companies_df["Symbol"].isin(ticker_list)]
 # =====================================================
 
 # Setup for correct summary table printing
-def print_styled_table(df, title,length = 129):
+def print_styled_table(df, title,length = 160):
     print("\n" + "=" * length)
     print(title.center(length))
     print("=" * length)
 
     # Format columns
     df_print = df.copy()
-    cols_2_decimal = ["Turnover", "Max_Drawdown", "Annual_Vol"]
-    cols_4_decimal = ["Sharpe", "Total Return", "Hit_Ratio", "CVaR", "TRR"]
+    df_print = df_print.rename(columns={
+        "Total Return": "Total Return",
+        "Sharpe": "Sharpe Ratio",
+        "Max_Drawdown": "Max Drawdown",
+        "Annual_Vol": "Volatility",
+        "Hit_Ratio": "Hit Ratio",
+        "Turnover": "Turnover",
+        "CVaR": "CVaR",
+        "TRR": "Tail Risk Reduction"
+    })
+    percent_cols = ["Total Return", "Max Drawdown", "Volatility", "CVaR"]
+    ratio_cols = ["Sharpe Ratio", "Hit Ratio", "Tail Risk Reduction"]
+    other_cols = ["Turnover"]
 
-    for col in cols_2_decimal:
+    for col in percent_cols:
+        if col in df_print.columns:
+            df_print[col] = df_print[col].apply(lambda x: f"{x * 100:.2f}%" if pd.notnull(x) else "-")
+
+    for col in ratio_cols:
+        if col in df_print.columns:
+            df_print[col] = df_print[col].apply(lambda x: f"{x:.3f}" if pd.notnull(x) else "-")
+
+    for col in other_cols:
         if col in df_print.columns:
             df_print[col] = df_print[col].apply(lambda x: f"{x:.2f}" if pd.notnull(x) else "-")
-    for col in cols_4_decimal:
-        if col in df_print.columns:
-            df_print[col] = df_print[col].apply(lambda x: f"{x:.4f}" if pd.notnull(x) else "-")
-    df_print = df_print.fillna("-")
-    df_print = df_print.sort_values(by=["Sharpe"], ascending=False)
+    ordered_cols = [
+        "Total Return",
+        "Sharpe Ratio",
+        "Volatility",
+        "Max Drawdown",
+        "CVaR",
+        "Tail Risk Reduction",
+        "Hit Ratio",
+        "Turnover"
+    ]
 
-    output = df_print.to_string(justify='center', col_space=10)
+    df_print = df_print[[col for col in ordered_cols if col in df_print.columns]]
+    df_print = df_print.fillna("-")
+    df_print = df_print.sort_values(by=["Sharpe Ratio"], ascending=False)
+
+    output = df_print.to_string(justify='center', col_space=14)
     print(output)
     print("-" * length)
 
@@ -156,7 +184,6 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
                     "Strategy": name,
                     **metrics
                 })
-
     return pd.DataFrame(all_metrics), diagnostic_equities
 
 
@@ -266,7 +293,7 @@ for strategy in returns_all["Strategy"].unique():
     })
 
 portfolio_df = pd.DataFrame(portfolio_metrics).set_index("Strategy")
-print_styled_table(portfolio_df, "PORTFOLIO PERFORMANCE (SINGLE PERIOD)")
+print_styled_table(portfolio_df, f"PORTFOLIO PERFORMANCE (2015.01-2020.04)")
 
 
 # ======================================================================================================================
@@ -276,7 +303,7 @@ tvs_results = results_df[results_df["Strategy"] == "Target Volatility Scaling (T
 tvs_results = tvs_results.drop(columns=["Strategy","CVaR"])
 tvs_results = tvs_results.set_index("Ticker")
 
-print_styled_table(tvs_results, "INDIVIDUAL TICKER PERFORMANCE (TVS STRATEGY)", 90)
+print_styled_table(tvs_results, "INDIVIDUAL TICKER PERFORMANCE (TVS STRATEGY)", 122)
 
 
 
@@ -302,8 +329,8 @@ if SHOW_PLOTS:
         else:
             plt.plot(equity, label=strategy, linewidth=1.5, alpha=0.6)
 
-    plt.title("Portfolio Equity Curve", fontsize=34)
-    plt.ylabel("Portfolio Value ($)",fontsize=26)
+    plt.title("Cumulative Portfolio Performance",fontsize=34)
+    plt.ylabel("Portfolio Value (Indexed to 100)",fontsize=26)
     plt.xlabel("Date",fontsize=26)
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
@@ -312,29 +339,32 @@ if SHOW_PLOTS:
     plt.show()
     # ======================================================================================================================
 
-
-
     # ======================================================================================================================
-    # Portfolio vs Average Stock (TVS only)
+    # Realized Volatility vs DYNAMIC Target
     plt.figure(figsize=(24, 12))
-    strategy = "Target Volatility Scaling (TVS)"
-    avg_stock_ret = returns_all.groupby(["Date", "Strategy"])["Ret"].mean().reset_index()
-    strat_avg = avg_stock_ret[avg_stock_ret["Strategy"] == strategy].set_index("Date")["Ret"]
-    avg_equity = initial_capital * (1 + strat_avg.fillna(0)).cumprod()
-    plt.plot(avg_equity, label=f"{strategy} (Avg Stock)", linestyle='--', linewidth=2, alpha=0.7)
 
-    portfolio_equity = initial_capital * (1 + portfolio_returns[strategy].fillna(0)).cumprod()
-    plt.plot(portfolio_equity, label=f"{strategy} (Portfolio)", linewidth=2, alpha=0.9)
+    window = 60
+    strategy_tvs = "Target Volatility Scaling (TVS)"
+    strategy_bh = "Buy & Hold"
 
-    plt.title("Portfolio vs Average Stock", fontsize=34)
-    plt.ylabel("Value ($)", fontsize=26)
+    realized_vol_tvs = portfolio_returns[strategy_tvs].rolling(window).std() * np.sqrt(252)
+    realized_vol_bh = portfolio_returns[strategy_bh].rolling(window).std() * np.sqrt(252)
+
+    plt.plot(realized_vol_bh, label=f"{strategy_bh} (Unmanaged)", color='C0', alpha=0.7, linewidth=2)
+    plt.plot(realized_vol_tvs, label=f"{strategy_tvs} (Managed)", color='C2', linewidth=2)
+
+    plt.title("Realized Volatility: TVS vs Buy & Hold", fontsize=34)
+    plt.ylabel("Annualized Volatility", fontsize=26)
     plt.xlabel("Date", fontsize=26)
+
+    plt.gca().yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x:.0%}'))
+
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
-    plt.legend(loc='upper left', fontsize=24)
-    plt.grid(True, alpha=0.3)
+    plt.legend(loc='upper right', fontsize=24)
+    plt.grid(True, alpha=0.2)
     plt.show()
-    # ======================================================================================================================
+    # ==================================================================================================================
 
 
 
@@ -352,7 +382,7 @@ if SHOW_PLOTS:
             plt.plot(drawdown, label=strategy, linewidth=1.5, alpha=0.5)
 
     plt.axhline(y=0, color='black', linestyle='--', linewidth=2, alpha=1)
-    plt.title("Drawdown Curve", fontsize=34)
+    plt.title("Portfolio Drawdowns", fontsize=34)
     plt.ylabel("Drawdown (%)", fontsize=26)
     plt.xlabel("Date", fontsize=26)
     plt.xticks(fontsize=20)
@@ -388,7 +418,7 @@ if SHOW_PLOTS:
                 plt.plot(drawdown, label=strategy, linewidth=1.5, alpha=0.5)
 
     plt.axhline(y=0, color='black', linestyle='--', linewidth=2, alpha=1)
-    plt.title(f"Drawdown Curve ({start_date} to {end_date})", fontsize=34)
+    plt.title(f"Drawdowns During Selected Period ({start_date} to {end_date})", fontsize=34)
     plt.ylabel("Drawdown (%)", fontsize=26)
     plt.xlabel("Date", fontsize=26)
     plt.xticks(fontsize=20)
@@ -400,26 +430,41 @@ if SHOW_PLOTS:
     # ======================================================================================================================
 
 
-
     # ======================================================================================================================
-    # Rolling Sharpe (60-day window)
+    # Rolling Sharpe (252-day window) with colored fill
     plt.figure(figsize=(24, 12))
-    window = 60
+    window = 252
+
+    rolling_sharpes = {}
     for strategy, ret in portfolio_returns.items():
         rolling_sharpe = ret.rolling(window).mean() / (ret.rolling(window).std() + 1e-8) * np.sqrt(252)
-        if strategy == "Target Volatility Scaling (TVS)":
-            plt.plot(rolling_sharpe, label=strategy, linewidth=2)
-        else:
-            plt.plot(rolling_sharpe, label=strategy, linewidth=1.5, alpha=0.7)
+        rolling_sharpes[strategy] = rolling_sharpe
+
+    if "Target Volatility Scaling (TVS)" in rolling_sharpes and "Buy & Hold" in rolling_sharpes:
+        difference = rolling_sharpes["Target Volatility Scaling (TVS)"] - rolling_sharpes["Buy & Hold"]
+
+        # Линия
+        plt.plot(difference, label="TVS - Buy & Hold", linewidth=2, color='black')
+
+        # Заливка: зеленый где > 0, красный где < 0
+        plt.fill_between(difference.index, 0, difference,
+                         where=(difference >= 0),
+                         color='C2', alpha=0.3, interpolate=True)
+        plt.fill_between(difference.index, 0, difference,
+                         where=(difference < 0),
+                         color='C3', alpha=0.3, interpolate=True)
 
     plt.axhline(y=0, color='black', linestyle='-', linewidth=2)
-    plt.axhline(y=1, color='gray', linestyle='--', linewidth=2, alpha=0.5)
-    plt.title(f"Rolling Sharpe Ratio ({window}-day window)", fontsize=34)
-    plt.ylabel("Sharpe Ratio", fontsize=26)
+    plt.axhline(y=0.5, color='gray', linestyle='--', linewidth=1.5, alpha=0.5)
+    plt.axhline(y=-0.5, color='gray', linestyle='--', linewidth=1.5, alpha=0.5)
+    plt.title(f"Rolling Sharpe Ratio Difference (TVS minus Buy & Hold)", fontsize=34)
+    plt.ylabel("Sharpe Ratio Difference", fontsize=26)
     plt.xlabel("Date", fontsize=26)
     plt.xticks(fontsize=20)
     plt.yticks(fontsize=20)
-    plt.legend(fontsize=24)
+    plt.legend(fontsize=20)
     plt.grid(True, alpha=0.3)
     plt.show()
-    # ======================================================================================================================
+    # ==================================================================================================================
+
+
