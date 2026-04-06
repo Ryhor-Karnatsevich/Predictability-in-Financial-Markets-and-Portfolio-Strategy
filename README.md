@@ -431,29 +431,208 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 - Based on the results, **Target Volatility Scaling (TVS)** was selected as the foundation for further development due to its theoretical clarity and strong risk-adjusted characteristics.
 
 
-## "Target Volatility Scaling (TVS)" Backtest improvement
 
-"Buy & Hold":
+
+
+
+
+## "Target Volatility Scaling (TVS)" improvement Backtest
+
+-The goal of that part is to improve TVS strategy to level where it shows better performance in risk managing than other strategies.
+
+-Decided to grade strategy by comparison with two other strategies: Buy & Hold, TVS (without improvements, only additional costs) 
+
+### Periods Setup
+- To test robustness and sensitivity strain/test split date from previous part has been improved.
+- Now there are 23 Periods starting 2007-06-01 and with a gap 6 months, with a duration of two years.
+- For "3 PERIODS ANALYSIS" I took: 
+    - 2007-06 - 2009-06 for it's crysis with a high volatility.
+    - 2015-06 - 2017-06 as a period of growth, to see strategy in opposite situation.
+    - 2018-06 - 2020-04 for growth in falling periods in one. (2000-04-01 is the last date in Dataset)
+- To calculate second table and all plots, all periods been used.
+
+### Model Improvements
+
+**"Buy & Hold"**
 - 0.05% commission for first and last day. Needed to recreate real trading conditions.
 
-TVS with transaction and margin costs:
-- target volatility = 2%
-- transaction costs = 0.05%
-- leverage margin costs = 5% annually
+**TVS with transaction and margin costs**
+- Target volatility = 2%
+- Transaction costs = 0.05%
+- Leverage margin costs = 5% annually
+- Leverage from 0 to 2
 
-TVS Advanced:
-  Basic:
-    - target volatility = 2%
-    - transaction costs = 0.05%
-    - leverage margin costs = 5% annually
-  Advanced:
-    - Limited volatility flour to 1.25% . 
-    - Assymetric target based on SMA200 (2% if >, 1% if not)
-    - Volatility Risk Premium Offset (get into account 0.8 * volatility)
-    - Rebalancing Threshold (Only update position if the change is greater than 3.5% )
+**Target Volatility Scaling Advanced**
+
+- Basic Costs:
+    - Transaction costs = 0.05%
+    - Leverage margin costs = 5% annually
+    - Leverage from 0 to 2
+- Advanced:
+    - Limited volatility floor to 1.2%
+    - Symmetric target - SMA_100 of volatility
+    - Volatility Risk Premium Offset - discount equal to 1
+    - Rebalancing Threshold (Only update position if the change is greater than 5% )
+    - Drawdown Protection - If drawdown more that 10% , then cut position in half.
 
 
-garch testing
-- grid verbose false - okay ,csv good
+- Also **Asymmetric Target** based on SMA(prices) has been tested. It did not give any advantage, so it was removed.
+
+### Evaluation Metrics
+
+- Average Performance of Strategies:
+    - Total Return
+    - Sharpe
+    - Max Drawdown 
+    - Annual Volatility
+    - Hit Ratio - probability for strategy to have profitable daily return.
+    - Turnover - the annual rate at which positions are traded or replaced.
+    - CVaR - Conditional Value at Risk   
+    - RMSE_Vol - Volatility Target Deviation 
+    - TRR - Tail Risk Reduction Ratio  
+    - Outperformance (vs B&H) - (Sharp of strategy > Sharpe of baseline).
+
+
+---
+
+![MLPI](Pictures/TVS_analysis.png)
+
+---
+
+
+### Interpretation
+
+- Some metrics show same pattern across all analysis: 
+    - Advanced TVS has lower Turnover comparing to Basic TVS, meaning it changes leverage smarter.
+    - Advanced TVS consistently improves tail risk (CVaR), reducing extreme losses compared to both Buy & Hold and basic TVS.
+    - Advanced TVS always improves TRR (additional metric for CVaR), meaning It better manages  sudden declines in all periods especially during crisis periods.
+    - Advanced TVS significantly decreases max_drawdowns and volatility, fulfilling its main goal - managing risks.  
+
+
+**3 PERIODS ANALYSIS:**
+
+- 2007-2009
+    - TVS_Advanced shows better metrics results than other strategies.
+    - Even return is positive.
+    - Buy & Hold is the worst strategy.
+- 2015-2017
+    - Buy & Hold has the best Sharpe ratio.
+    - At first glance it may seem that TVS Basic is better that Advanced ,but it has high turnover meaning it overtrading. And with very high risks.
+    - Advanced TVS is the most stable in risks, despite it has lower returns.
+- 2018-2020
+    - Bets period for Advanced TVS. Highest Sharpe, lowest risks(low volatility and drawdowns) and better position managing(low turnover).
+    - Basic TVS also is better in return and Sharpe than B&H , but has worse risk measuring metrics.
+
+
+**AVERAGE PERFORMANCE ACROSS SELECTED PERIODS:**
+- Advanced TVS has lower return and  Sharpe, with better results in risk managing.
+- That table represents average across 23-year period, so it contained rises and declines.
+
+
+**Analysis Conclusion:**
+- TVS Advanced demonstrates superior risk management by significantly decreasing maximal drawdowns and volatility compared to both Buy & Hold and basic TVS.
+- The strategy produces lower absolute returns but offers much more stable, less volatile growth, making it an ideal fit for crisis periods.
+- By using a dynamic leverage and rebalancing threshold, the strategy adapts to market conditions "smarter" than the basic version, resulting in lower costs and better tail-risk protection.
+- The strategy passes robustness checks, showing stable performance across different market regimes and parameter settings, indicating no significant overfitting.
+
+### Visualisation
+
+**Graphics**
+- GLOBAL STRATEGY ROBUSTNESS ANALYSIS (2007-2020):
+    - Sharp Ration dynamics
+    - Max Drawdown per period
+    - Total Return per period
+    - Average Equity Curve
+
+
+- LEVERAGE DISTRIBUTION
+
+
+- SENSITIVITY ANALYSIS: RISK & PERFORMANCE HEATMAPS:
+    - Mean Sharpe Ratio (Efficiency
+    - Mean CVaR (Tail Risk)
+    - Mean Total Return (Performance)
+    - Std Dev of Sharpe (Stability)
+
+**Sensitivity Setup:**
+- Rebalance values [0.02, 0.03, 0.04, 0.05]
+- Volatility discount [0.6, 0.8, 1.0]
+- 12 different combinations.
+
+---
+
+![MLPI](Pictures/plot1_tvs.png)
+
+---
+
+![MLPI](Pictures/plot2_tvs.png)
+
+---
+
+![MLPI](Pictures/plot3_tvs.png)
+
+---
+
+
+### Plots interpretation
+
+The goal of this analysis was to ensure that the strategy's performance is not a result of "overfitting" or "lucky" parameter selection. A robust strategy should show stable behavior even when its core inputs are slightly modified.
+
+
+GLOBAL STRATEGY ROBUSTNESS ANALYSIS (2007-2020)
+- Sharpe Ratio Dynamics:  Advanced TVS shows more stability across periods, while Buy & Hold fluctuates heavily.
+- Max Drawdown: TVS strategies consistently reduce drawdowns, especially during crisis periods.Advanced version has the best results. 
+- Total Return: Buy & Hold and TVS_Basic dominate in strong bull markets. In 2009 and 2020 TVS Advanced shows high return.
+- Average Equity Curve: Advanced TVS produces smoother growth with fewer sharp drops.
+
+
+LEVERAGE DISTRIBUTION:
+- Due to floor = 0.12 for volatility, max leverage becomes 1.(66) and not 2.
+- During programming has been tested different leverages, and that exact setup is the most profitable and stable.
+- The highest frequency occurs at 1.0x leverage. 
+- This is the result of the Rebalancing Threshold (5%), which prevents unnecessary turnover by keeping the position at 100% weight unless volatility shifts significantly.
+- Right-Skewed Tail: The distribution exhibits a positive skew (right tail) extending from 1.0 to 1.66. This represents systematic scaling during low-volatility regimes to maintain the risk target.
+- The lack of a "fat" left tail (positions < 0.5) indicates that the strategy rarely sits in deep cash, preferring to stay fully invested.
+
+
+SENSITIVITY ANALYSIS: RISK & PERFORMANCE HEATMAPS:
+
+Changing rebalance shows not much difference, only small error.
+
+- Mean Sharpe Ratio: Increasing discount value slightly increases Sharpe.
+- Mean CVaR: Increasing discount value increases CVaR value. 
+- Mean Total Return: Increasing discount value reduces Return by ~8%.
+- Std Dev of Sharpe: Increasing discount value slightly increases Sharpe deviation.
+
+**Plots Conclusion:**
+- TVS Advanced shows best results in risk managing by decreasing maximal drawdowns and volatility.
+- It produces less return, but with less volatile growth. Best fit for crisis periods.
+- Strategy smoothly changes position depending on market condition by using leverage.
+- Optimum parameters for rebalance and discount are 0.05 and 1. It was chosen as a default setup for strategy.
+- The TVS Advanced strategy successfully passed the sensitivity test. The performance metrics change smoothly and predictably across the parameter grid rather than showing "random" peaks.
+
+
+
+### TVS Advanced Conclusion
+
+- The Advanced TVS framework improves the original strategy by introducing adaptive risk controls, resulting in consistently lower drawdowns, volatility, and tail risk across all tested market regimes.
+- While the strategy sacrifices part of upside performance during strong bull markets, it delivers a significantly smoother and more stable return profile.
+- The inclusion of rebalancing thresholds and drawdown-based risk control reduces unnecessary turnover and improves capital efficiency.
+- Robustness and sensitivity tests confirm that the results are stable across different parameter configurations, indicating that the performance is structural rather than driven by overfitting.
+
+
+**Financial Insight**
+- The results highlight a fundamental trade-off between return maximization and risk control: strategies that maximize exposure (e.g., Buy & Hold or basic TVS) tend to outperform during bull markets but are highly vulnerable to drawdowns and tail events.
+- In contrast, volatility-managed strategies like Advanced TVS act as a dynamic risk overlay, adjusting exposure in response to changing market conditions and stabilizing the return distribution.
+- From a portfolio construction perspective, this type of strategy is not necessarily designed to outperform in absolute terms, but to improve risk-adjusted performance and reduce downside convexity.
+- This makes Advanced TVS particularly relevant for:
+  - risk-constrained portfolios
+  - capital preservation mandates
+  - multi-asset allocation frameworks as a volatility stabilizer
+
+
+**Key takeaway:**
+
+Volatility targeting does not necessarily maximize returns, but it improves the stability, predictability, and downside protection of returns — which is often more valuable than raw performance in professional portfolio management.
 
 

@@ -82,7 +82,7 @@ def strategies_backtest(results, rebalance=0.05, vol_discount=1):
 
 
         # ==============================================================================================================
-        # [3] Target Volatility Scaling Advanced
+        # [3] "Target Volatility Scaling Advanced"
         # 1  Setup: Leverage, Costs and Prices
         leverage = 2
         # vol_discount = 1  # value to offset predicted volatility, if it is overrated
