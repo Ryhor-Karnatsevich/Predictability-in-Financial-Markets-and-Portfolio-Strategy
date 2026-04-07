@@ -30,16 +30,17 @@ np.random.seed(52)
 # Want to save results into csv file?
 save = False
 ### SETUP
-MODE = "FINAL"
+MODE = "GRID"
 split_date_grid = "2019-01-01"
 # if for backtest then True, if for portfolio then False
+pkl = False
 BACKTEST = False
 if BACKTEST:
     split_dates = [f"{y}-{m:02d}-01" for y in range(2007, 2019) for m in (6, 12) if not (y == 2018 and m == 12)] #["2007-06-01", "2012-01-01", "2015-01-01","2018-04-01"]
 else:
     split_dates = ["2015-01-01"]
 
-use_random = False
+use_random = True
 n = 20
 # configurations for FINAL MODE
 CONFIGS = {
@@ -190,7 +191,7 @@ elif MODE == "FINAL":
                  for ticker in tickers]
 
         results = Parallel(n_jobs=-1)(
-            delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=False)
+            delayed(garch_run)(df, ticker, split_date, type=v, p=p, q=q, verbose=True)
             for ticker, v, p, q in tasks
         )
         results = [r for r in results if r is not None]
@@ -244,9 +245,10 @@ print(f"\n Run Time : {run_time:.2f} seconds")
 
 
 import pickle
-if BACKTEST:
-    with open("../../Data/Results/garch_results.pkl", "wb") as f:
-        pickle.dump(all_series_data, f)
-else:
-    with open("../../Data/Results/portfolio.pkl", "wb") as f:
-        pickle.dump(all_series_data, f)
+if pkl:
+    if BACKTEST:
+        with open("../../Data/Results/garch_results.pkl", "wb") as f:
+            pickle.dump(all_series_data, f)
+    else:
+        with open("../../Data/Results/portfolio.pkl", "wb") as f:
+            pickle.dump(all_series_data, f)
