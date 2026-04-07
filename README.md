@@ -642,3 +642,113 @@ Volatility targeting does not necessarily maximize returns, but it improves the 
 
 ### Potfolio Based on TVS
 
+The goal of that part is to build equal_weight portfolio based on **"TVS Advanced"** strategy.
+And based on metrics grade its efficiency during chosen period and on chosen list of stocks. 
+
+### Data
+
+Train period = 2000.01.01 - 2014.12.31
+Test  period = 2015.01.01 - 2020-04-01
+tickers = [AAPL, GILD, GOOGL, MSFT, AMZN, MLPI, PEP, COST, CSCO, AMGN]
+Weights in portfolio = **"EQUAL"**
+
+### Evaluation Metrics
+
+- Average Performance of Strategies:
+    - Total Return
+    - Sharpe Ratio
+    - Annual Volatility
+    - Max Drawdown
+    - CVaR - Conditional Value at Risk
+    - TRR - Tail Risk Reduction Ratio
+    - Hit Ratio - probability for strategy to have profitable daily return.
+    - Turnover - the annual rate at which positions are traded or replaced.
+    
+
+- Calculated average metrics for whole portfolio in "PORTFOLIO PERFORMANCE" and for each stock independently in "INDIVIDUAL TICKER PERFORMANCE".
+
+---
+
+![MLPI](Pictures/portfolio_5.png)
+
+---
+
+### Interpretation
+The portfolio results show a clear difference between return-oriented and risk-managed strategies.
+
+Buy & Hold delivers strong total return (70.25%), but at the cost of high volatility (18.71%) and deep drawdowns (-24.79%). This confirms that the baseline is fully exposed to market risk.
+
+The basic TVS strategy achieves the highest return (75.50%), but also increases volatility (21.64%) and does not improve downside risk. Negative Tail Risk Reduction indicates worse behavior in extreme scenarios compared to the baseline.
+
+TVS Advanced provides lower total return (58.24%), but significantly improves risk characteristics. Volatility is reduced to 11.96%, and drawdowns are almost two times smaller (-12.87%). It also shows better tail risk metrics (CVaR and TRR) and the highest Sharpe ratio (0.792).
+
+At the individual stock level, the strategy behaves consistently across most assets. Strong stocks such as AMZN, AAPL, and MSFT achieve high Sharpe ratios, while weaker assets (e.g., MLPI) still experience large losses, showing that volatility control does not eliminate structural downside.
+
+Overall, TVS Advanced reduces risk and stabilizes performance, even though it sacrifices part of the total return.
+
+
+
+### Visualisation
+
+**Graphics**
+- Cumulative Portfolio Performance
+- Realized Volatility: TVS vs Buy & Hold
+- Drawdowns During Selected Period (2018.01 - 2019.06)
+- Rolling Sharpe Ratio Difference (TVS Sharpe - B&H Sharpe), window = 252.
+
+
+---
+
+![MLPI](Pictures/portfolio_1.png)
+
+---
+
+![MLPI](Pictures/portfolio_2.png)
+
+---
+
+![MLPI](Pictures/portfolio_3.png)
+
+---
+
+![MLPI](Pictures/portfolio_4.png)
+
+---
+
+### Plots Interpretation
+
+[1] Cumulative Portfolio Performance
+- TVS Advanced shows smooth growth with sudden declines two times smaller than Baseline.
+- It is very well seen during pandemia crisis. After decline, strategies had same cumulative return value despite the fact that, for the whole timeline baseline was growing faster.
+
+[2] Realized Volatility: TVS vs Buy & Hold
+- TVS shows much more stable volatility managing. Even during stable periods its volatility lower than at baseline.
+- Average annual volatility is about 12%
+
+[3] Drawdowns During Selected Periods (2018.01 - 2019.06)
+- That period was chosen as an example. It represents pattern that are exist on a whole timeline.
+- TVS Basic had the lowest drawdowns, meaning strategy is too much aggressive. 
+- Baseline was also too much volatile.
+- TVS Advanced shows best results in risk control.
+
+[4] Rolling Sharpe Ratio Difference
+- It has left side as very low sharpe comparing to baseline , and right side where the advantage begins to increase.
+- It may be connected to different market conditions and levels of volatility
+
+
+### Conclusion
+
+The results show that the TVS Advanced strategy provides the most balanced performance among all considered approaches. While it does not achieve the highest total return, it significantly improves risk control by reducing volatility and drawdowns, and delivers the best risk-adjusted performance as reflected in the Sharpe ratio.
+
+In contrast, both Buy & Hold and the basic TVS approach prioritize return over stability, leading to higher exposure to market fluctuations and worse behavior during adverse periods.
+
+Overall, TVS Advanced demonstrates that incorporating volatility-based position sizing can stabilize portfolio dynamics and improve consistency of returns, even at the cost of reduced absolute performance.
+
+
+### Financial Insights
+
+From a practical perspective, the results highlight the importance of risk management over pure return maximization. Strategies that aggressively target higher returns tend to increase exposure to extreme losses, which can significantly impact long-term performance.
+
+The TVS Advanced approach shows that controlling volatility and limiting drawdowns can lead to more stable and predictable outcomes. This is particularly relevant in uncertain or highly volatile market conditions.
+
+However, the results also indicate that volatility-based strategies are not sufficient to protect against structurally weak assets. Therefore, combining volatility control with asset selection or filtering may further improve overall portfolio performance.
