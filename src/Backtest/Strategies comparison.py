@@ -9,7 +9,7 @@ pd.set_option('display.width', 1000)
 pd.options.display.float_format = '{:.4f}'.format
 
 # Import data
-with open("../../Data/Results/garch_results.pkl", "rb") as f:
+with open("../../Data/Results/comparison.pkl", "rb") as f:
     results = pickle.load(f)
 
 
@@ -34,7 +34,7 @@ def strategies_backtest(results, verbose=True):
 
         # [2] Volatility Scaling strategy (Risk Reduction)
         target_vol = 0.02
-        position = (target_vol / vol).clip(0, 2)  # No leverages, 0-1x
+        position = (target_vol / vol).clip(0, 1)  # No leverages, 0-1x
         return_2 = position * returns
 
         # [3] Volatility Filter (binary switch)
@@ -44,7 +44,7 @@ def strategies_backtest(results, verbose=True):
 
         # [4] SMA based strategy
         volatility_sma = vol.rolling(window=20).mean()  # SMA_20
-        weight_sma = (volatility_sma / vol).clip(0, 2)
+        weight_sma = (volatility_sma / vol).clip(0, 1)
         return_4 = weight_sma * returns
 
         # [5] Volatility Scaling + Momentum
@@ -111,8 +111,10 @@ def strategies_backtest(results, verbose=True):
             axes[0, 1].grid(True, alpha=0.3)
 
             # Plot 3: Dynamic Weights (TVS vs Smart)
+            axes[1, 0].plot(position, label="Vol Scaling (TVS)", alpha=0.6, color='C1')
             axes[1, 0].plot(position, label="Target Volatility Scaling (TVS)", alpha=0.6, color='C1')
             # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C2')                    # not the best option
+            axes[1, 0].plot(weight_sma, label="Vol Smart (SMA)", alpha=0.6, color='C3')
             axes[1, 0].plot(weight_sma, label="Volatility Ratio (MA20)", alpha=0.6, color='C3')
             # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C0')   # not the best option
             axes[1, 0].axhline(y=1, color='black', linestyle='--', alpha=0.5)
@@ -179,7 +181,7 @@ def calculate_metrics(returns_series, equity_series):
 
 
 # EXECUTION
-results_df = strategies_backtest(results, verbose=False)
+results_df = strategies_backtest(results, verbose=True)
 
 # FINAL SUMMARY TABLE
 summary = results_df.groupby("Strategy").agg({

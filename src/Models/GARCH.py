@@ -40,7 +40,8 @@ split_date_grid = "2019-01-01"
 # if for backtest then True, if for portfolio then False
 pkl = True
 BACKTEST = False
-for_final = False
+for_final = True
+comparison = True
 if BACKTEST:
     split_dates = [f"{y}-{m:02d}-01" for y in range(2007, 2019) for m in (6, 12) if not (y == 2018 and m == 12)] #["2007-06-01", "2012-01-01", "2015-01-01","2018-04-01"]
 elif for_final:
@@ -253,6 +254,9 @@ import pickle
 if pkl:
     if BACKTEST:
         with open("../../Data/Results/garch_results.pkl", "wb") as f:
+            pickle.dump(all_series_data, f)
+    elif comparison:
+        with open("../../Data/Results/comparison.pkl", "wb") as f:
             pickle.dump(all_series_data, f)
     else:
         with open("../../Data/Results/portfolio.pkl", "wb") as f:
