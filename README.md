@@ -22,6 +22,14 @@ The goal is to examine return behavior, volatility patterns, and relationships b
 - Developed and improved TVS strategy
 - Implemented portfolio-level evaluation
 
+### Robustness and Sensitivity
+- 9 volatility model configurations tested per asset (GARCH / EGARCH / APARCH)
+- 100+ model estimations in FINAL MODE
+- 23 rolling backtest periods
+- 12 parameter combinations in sensitivity analysis
+
+Total: 1000+ model/strategy evaluations
+
 ## Limitations
 
 - No walk-forward / rolling retraining (static train/test split)
