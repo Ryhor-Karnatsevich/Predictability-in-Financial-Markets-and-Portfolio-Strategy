@@ -98,23 +98,21 @@ def strategies_backtest(results, verbose=True):
 
             # Plot 1: Equity Curves
             for name, data in plot_data.items():
-                axes[0, 0].plot(data["equity"], label=name, alpha=0.9)
+                axes[0, 0].plot(data["equity"], label=name, alpha=0.75)
             axes[0, 0].set_title("Equity Curves (Cumulative Return)")
             axes[0, 0].legend()
             axes[0, 0].grid(True, alpha=0.3)
 
             # Plot 2: Drawdowns
             for name, data in plot_data.items():
-                axes[0, 1].fill_between(data["drawdown"].index, data["drawdown"], 0, alpha=0.3, label=name)
+                axes[0, 1].plot(data["drawdown"].index, data["drawdown"], alpha=0.7, label=name, linewidth=1.5)
             axes[0, 1].set_title("Drawdowns")
             axes[0, 1].legend()
             axes[0, 1].grid(True, alpha=0.3)
 
             # Plot 3: Dynamic Weights (TVS vs Smart)
-            axes[1, 0].plot(position, label="Vol Scaling (TVS)", alpha=0.6, color='C1')
             axes[1, 0].plot(position, label="Target Volatility Scaling (TVS)", alpha=0.6, color='C1')
             # axes[1, 0].plot(weight_filter, label="Vol Switch", alpha=0.6, color='C2')                    # not the best option
-            axes[1, 0].plot(weight_sma, label="Vol Smart (SMA)", alpha=0.6, color='C3')
             axes[1, 0].plot(weight_sma, label="Volatility Ratio (MA20)", alpha=0.6, color='C3')
             # axes[1, 0].plot(weight_trend_scaling, label="Vol Scaling & Switch", alpha=0.6, color='C0')   # not the best option
             axes[1, 0].axhline(y=1, color='black', linestyle='--', alpha=0.5)
