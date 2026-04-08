@@ -28,7 +28,23 @@ The goal is to examine return behavior, volatility patterns, and relationships b
 - 23 rolling backtest periods
 - 12 parameter combinations in sensitivity analysis
 
-Total: 1000+ model/strategy evaluations
+Total: 9,000+ model estimations and strategy evaluations (including sensitivity analysis)
+
+
+### Key Portfolio Results
+
+TVS Advanced significantly reduces risk (volatility and drawdowns) 
+while maintaining competitive returns.
+
+| Strategy                          | Return | Sharpe | Volatility | Max DD  |
+|----------------------------------|--------|--------|------------|---------|
+| TVS Advanced                     | 58.2%  | 0.79   | 12.0%      | -12.9%  |
+| Buy & Hold                       | 70.3%  | 0.64   | 18.7%      | -24.8%  |
+
+
+![ols1](Pictures/preview.png)
+
+---
 
 ## Limitations
 
@@ -57,7 +73,7 @@ The project is organized as a sequential pipeline. Scripts should be run in the 
 - **data_cleaning.py** → cleans raw price data
 
 ### 2. Feature Engineering & EDA
-- **feature_engineering.py** → computes values
+- **feature_engineering.py** → computes features
 - **EDA.py** → exploratory data analysis (to understand data nature) 
 
 ### 3. Modeling
@@ -187,6 +203,12 @@ Two levels of analysis were defined: market level and stock level.
 - Most stocks have a large number of observations close to the maximum available.
 - However, some stocks have significantly fewer data points due to later listing dates.
 - To ensure data reliability, stocks with fewer than 500 observations were removed.
+
+---
+
+![ols1](Pictures/EDA/board.png)
+
+---
 
 
 # Model Creating
@@ -483,7 +505,7 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 
 ---
 
-![MLPI](Pictures/S_Comparison/CSCO_strategies.png)
+![MLPI](Pictures/S_Comparison/1.png)
 
 ---
 
@@ -515,10 +537,10 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 -Decided to grade strategy by comparison with two other strategies: Buy & Hold, TVS (without improvements, only additional costs) 
 
 ### Periods Setup
-- To test robustness and sensitivity strain/test split date from previous part has been improved.
+- To test robustness and sensitivity train/test split date from previous part has been improved.
 - Now there are 23 Periods starting 2007-06-01 and with a gap 6 months, with a duration of two years.
 - For "3 PERIODS ANALYSIS" I took: 
-    - 2007-06 - 2009-06 for it's crysis with a high volatility.
+    - 2007-06 - 2009-06 for its crisis with a high volatility.
     - 2015-06 - 2017-06 as a period of growth, to see strategy in opposite situation.
     - 2018-06 - 2020-04 for growth in falling periods in one. (2000-04-01 is the last date in Dataset)
 - To calculate second table and all plots, all periods been used.
@@ -592,7 +614,7 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
     - At first glance it may seem that TVS Basic is better that Advanced ,but it has high turnover meaning it overtrading. And with very high risks.
     - Advanced TVS is the most stable in risks, despite it has lower returns.
 - 2018-2020
-    - Bets period for Advanced TVS. Highest Sharpe, lowest risks(low volatility and drawdowns) and better position managing(low turnover).
+    - Best period for Advanced TVS. Highest Sharpe, lowest risks(low volatility and drawdowns) and better position managing(low turnover).
     - Basic TVS also is better in return and Sharpe than B&H , but has worse risk measuring metrics.
 
 
@@ -611,7 +633,7 @@ The goal of that part is to implement EGARCH(2,1) model into four strategies, ch
 
 **Graphics**
 - GLOBAL STRATEGY ROBUSTNESS ANALYSIS (2007-2020):
-    - Sharpe Ration dynamics
+    - Sharpe Ratio dynamics
     - Max Drawdown per period
     - Total Return per period
     - Average Equity Curve
@@ -788,7 +810,7 @@ Overall, TVS Advanced reduces risk and stabilizes performance, even though it sa
 
 [1] Cumulative Portfolio Performance
 - TVS Advanced shows smooth growth with sudden declines two times smaller than Baseline.
-- It is very well seen during pandemia crisis. After decline, strategies had same cumulative return value despite the fact that, for the whole timeline baseline was growing faster.
+- It is very well seen during pandemic crisis. After decline, strategies had same cumulative return value despite the fact that, for the whole timeline baseline was growing faster.
 
 [2] Realized Volatility: TVS vs Buy & Hold
 - TVS shows much more stable volatility managing. Even during stable periods its volatility lower than at baseline.
